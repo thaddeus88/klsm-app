@@ -34,7 +34,8 @@ const initialZones = [
 
 const initialUsers = [
   { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2 times/day", password: "1234" },
-  { id: 2, name: "Admin Jane", role: "Admin", zones: ["All"], freq: "N/A", password: "1234" }
+  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234" },
+  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234" }
 ];
 
 const initialParameters = [
@@ -81,7 +82,7 @@ export default function App() {
       id: Date.now(),
       name: e.target.name.value,
       role: e.target.role.value,
-      zones: e.target.role.value === 'Admin' ? ['All'] : checkedZones,
+      zones: (e.target.role.value === 'Level 1 Admin' || e.target.role.value === 'Level 2 Admin') ? ['All'] : checkedZones,
       freq: e.target.freq.value,
       password: e.target.password.value
     };
@@ -120,7 +121,7 @@ export default function App() {
     }));
   };
 
-  const displayedZones = currentUser?.role === 'Admin' 
+  const displayedZones = (currentUser?.role === 'Level 1 Admin' || currentUser?.role === 'Level 2 Admin') 
     ? initialZones 
     : initialZones.filter(z => currentUser?.zones.includes(z));
 
@@ -169,11 +170,11 @@ export default function App() {
             
             <nav className="flex overflow-x-auto md:flex-col gap-2 md:gap-2 flex-1 scrollbar-hide pb-1 md:pb-0">
               <button onClick={() => setActiveTab('dashboard')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20}/> <span className="whitespace-nowrap">Dashboard</span></button>
-              {currentUser?.role === 'Admin' && (
-                <>
-                  <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> <span className="whitespace-nowrap">Analytics</span></button>
-                  <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20}/> <span className="whitespace-nowrap">Settings</span></button>
-                </>
+              {(currentUser?.role === 'Level 1 Admin' || currentUser?.role === 'Level 2 Admin') && (
+                <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> <span className="whitespace-nowrap">Analytics</span></button>
+              )}
+              {currentUser?.role === 'Level 1 Admin' && (
+                <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20}/> <span className="whitespace-nowrap">Settings</span></button>
               )}
             </nav>
             <div className="hidden md:block pt-4 border-t border-slate-800 mt-auto">
@@ -304,7 +305,11 @@ export default function App() {
                         </div>
                         <div>
                            <label className="block text-xs font-bold text-slate-500 mb-1">Role</label>
-                           <select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"><option>Inspector</option><option>Admin</option></select>
+                           <select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                              <option>Inspector</option>
+                              <option>Level 1 Admin</option>
+                              <option>Level 2 Admin</option>
+                           </select>
                         </div>
                         <div>
                            <label className="block text-xs font-bold text-slate-500 mb-1">Daily Frequency</label>
@@ -340,7 +345,7 @@ export default function App() {
                         {personnel.map(p => (
                         <tr key={p.id} className="hover:bg-slate-50/50">
                           <td className="p-4 font-bold text-slate-800">{p.name}</td>
-                          <td className="p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role === 'Admin' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
+                          <td className="p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role.includes('Admin') ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
                           <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{p.zones.join(', ')}</td>
                           <td className="p-4 font-medium">{p.freq}</td>
                           <td className="p-4 text-right">
