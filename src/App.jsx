@@ -18,6 +18,7 @@ const BarChart3 = (p) => <IconWrapper {...p}><path d="M3 3v18h18"/><rect width="
 const UserPlus = (p) => <IconWrapper {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></IconWrapper>;
 const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
 const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
+const Activity = (p) => <IconWrapper {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -226,6 +227,52 @@ export default function App() {
                             <td className="p-4"><span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg">In Progress</span></td>
                           </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600"/> Zone Performance Overview</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
+                        <tr>
+                          <th className="p-4 rounded-tl-xl">Zone</th>
+                          <th className="p-4">Last Inspected</th>
+                          <th className="p-4">Issues Found</th>
+                          <th className="p-4">Compliance Rate</th>
+                          <th className="p-4 rounded-tr-xl">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {initialZones.map((zone, idx) => {
+                          const compliance = 100 - (idx * 5);
+                          const issues = idx > 5 ? (idx * 2) - 5 : 0; 
+                          const status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
+                          const statusColors = {
+                             'Good': 'bg-emerald-100 text-emerald-700',
+                             'Warning': 'bg-amber-100 text-amber-700',
+                             'Critical': 'bg-red-100 text-red-700'
+                          };
+                          
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="p-4 font-bold text-slate-800 max-w-xs truncate" title={zone}>{zone}</td>
+                              <td className="p-4 text-slate-600">Today, 10:00 AM</td>
+                              <td className="p-4 font-medium">{issues > 0 ? <span className="text-red-600">{issues}</span> : <span className="text-slate-400">0</span>}</td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px]">
+                                    <div className={`h-2.5 rounded-full ${compliance >= 90 ? 'bg-emerald-500' : (compliance >= 70 ? 'bg-amber-500' : 'bg-red-500')}`} style={{width: `${compliance}%`}}></div>
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-500">{compliance}%</span>
+                                </div>
+                              </td>
+                              <td className="p-4"><span className={`px-2 py-1 text-xs font-bold rounded-lg ${statusColors[status]}`}>{status}</span></td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
