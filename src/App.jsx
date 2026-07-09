@@ -125,7 +125,7 @@ export default function App() {
     : initialZones.filter(z => currentUser?.zones.includes(z));
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center w-full">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600">
@@ -156,27 +156,34 @@ export default function App() {
         </div>
       ) : (
         <>
-          <aside className="w-64 bg-slate-900 text-white p-6 flex flex-col border-r border-slate-800 shadow-xl z-10">
-            <h1 className="text-xl font-black mb-8 text-orange-500 tracking-tight flex items-center gap-2">
-              <ShieldAlert size={24}/> KLSM Hub
-            </h1>
-            <nav className="space-y-2 flex-1">
-              <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20}/> Dashboard</button>
+          <aside className="w-full md:w-64 md:h-screen md:sticky top-0 bg-slate-900 text-white p-4 md:p-6 flex flex-col border-b md:border-b-0 md:border-r border-slate-800 shadow-xl z-10 md:shrink-0">
+            <div className="flex justify-between items-center mb-4 md:mb-8">
+              <h1 className="text-xl font-black text-orange-500 tracking-tight flex items-center gap-2">
+                <ShieldAlert size={24}/> KLSM Hub
+              </h1>
+              <div className="md:hidden flex items-center gap-3">
+                  <span className="text-xs text-slate-400 font-bold">{currentUser.name}</span>
+                  <button onClick={() => {setCurrentUser(null); setActiveTab('login');}} className="text-red-400 hover:text-red-300"><LogOut size={20}/></button>
+              </div>
+            </div>
+            
+            <nav className="flex overflow-x-auto md:flex-col gap-2 md:gap-2 flex-1 scrollbar-hide pb-1 md:pb-0">
+              <button onClick={() => setActiveTab('dashboard')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20}/> <span className="whitespace-nowrap">Dashboard</span></button>
               {currentUser?.role === 'Admin' && (
                 <>
-                  <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> Analytics</button>
-                  <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20}/> Settings</button>
+                  <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> <span className="whitespace-nowrap">Analytics</span></button>
+                  <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center justify-center md:justify-start gap-2 px-4 py-2 md:p-3 rounded-xl font-semibold transition-colors shrink-0 ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20}/> <span className="whitespace-nowrap">Settings</span></button>
                 </>
               )}
             </nav>
-            <div className="pt-4 border-t border-slate-800 mb-4">
+            <div className="hidden md:block pt-4 border-t border-slate-800 mt-auto">
                <p className="text-xs text-slate-400 font-semibold mb-1">Logged in as:</p>
-               <p className="text-sm font-bold text-white">{currentUser.name}</p>
+               <p className="text-sm font-bold text-white mb-3">{currentUser.name}</p>
+               <button onClick={() => {setCurrentUser(null); setActiveTab('login');}} className="flex items-center gap-3 w-full p-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl font-bold transition-colors"><LogOut size={20}/> Sign Out</button>
             </div>
-            <button onClick={() => {setCurrentUser(null); setActiveTab('login');}} className="flex items-center gap-3 w-full p-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl font-bold transition-colors"><LogOut size={20}/> Sign Out</button>
           </aside>
 
-          <main className="flex-1 p-8 overflow-y-auto bg-slate-50">
+          <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full bg-slate-50">
             {activeTab === 'dashboard' && (
               <div className="max-w-7xl mx-auto">
                 <h2 className="text-2xl font-black mb-6 text-slate-900">Your Assigned Zones</h2>
@@ -401,9 +408,10 @@ export default function App() {
                            <option value="Fail">🔴 Fail</option>
                            <option value="NA">⚪ N/A</option>
                         </select>
-                        <button className="flex items-center justify-center gap-2 w-full sm:w-auto bg-white border border-slate-300 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-100 transition-colors">
+                        <label className="flex items-center justify-center gap-2 w-full sm:w-auto bg-white border border-slate-300 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-100 transition-colors cursor-pointer">
                            <Camera size={16}/> Add Photo
-                        </button>
+                           <input type="file" accept="image/*" capture="environment" className="hidden" />
+                        </label>
                       </div>
                     </div>
                   ))}
