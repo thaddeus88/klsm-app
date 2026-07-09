@@ -17,6 +17,7 @@ const Camera = (p) => <IconWrapper {...p}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 
 const BarChart3 = (p) => <IconWrapper {...p}><path d="M3 3v18h18"/><rect width="4" height="7" x="7" y="10" rx="1"/><rect width="4" height="12" x="15" y="5" rx="1"/></IconWrapper>;
 const UserPlus = (p) => <IconWrapper {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></IconWrapper>;
 const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
+const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -95,6 +96,29 @@ export default function App() {
     }
   };
 
+  const addSubParam = (e, paramId) => {
+    e.preventDefault();
+    const text = e.target.subParamText.value.trim();
+    if (!text) return;
+    
+    setParams(params.map(p => {
+      if (p.id === paramId) {
+        return { ...p, subParams: [...p.subParams, { id: Date.now(), text }] };
+      }
+      return p;
+    }));
+    e.target.reset();
+  };
+
+  const removeSubParam = (paramId, subParamId) => {
+    setParams(params.map(p => {
+      if (p.id === paramId) {
+        return { ...p, subParams: p.subParams.filter(sp => sp.id !== subParamId) };
+      }
+      return p;
+    }));
+  };
+
   const displayedZones = currentUser?.role === 'Admin' 
     ? initialZones 
     : initialZones.filter(z => currentUser?.zones.includes(z));
@@ -105,7 +129,7 @@ export default function App() {
         <div className="min-h-screen bg-slate-900 flex items-center justify-center w-full">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600">
             <ShieldAlert className="mx-auto text-orange-600 mb-4" size={48} />
-            <h1 className="text-2xl font-black mb-2 text-slate-900 tracking-tight">KLSM Workplace Inspection Hub</h1>
+            <h1 className="text-2xl font-black mb-2 text-slate-900 tracking-tight">KLSM Inspection Hub</h1>
             <p className="text-sm text-slate-500 mb-6 font-medium">Authorized Personnel Only</p>
             
             {loginError && (
@@ -277,6 +301,38 @@ export default function App() {
                     </table>
                   </div>
                 </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-slate-800"><ClipboardList className="text-orange-600"/> Parameter Management</h3>
+                  <p className="text-sm text-slate-500 mb-6">Manage sub-parameters for the 8 main inspection categories.</p>
+                  
+                  <div className="space-y-4">
+                    {params.map(p => (
+                      <div key={p.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                         <div className="bg-slate-50 p-4 border-b border-slate-200 font-bold text-slate-800 flex justify-between items-center">
+                            <span>{p.id}. {p.name}</span>
+                            <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{p.subParams.length} items</span>
+                         </div>
+                         <div className="p-4 bg-white">
+                            <ul className="space-y-2 mb-4">
+                              {p.subParams.length === 0 && <li className="text-sm text-slate-400 italic">No sub-parameters added yet.</li>}
+                              {p.subParams.map(sp => (
+                                 <li key={sp.id} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-sm font-medium text-slate-700">
+                                   <span>{sp.text}</span>
+                                   <button onClick={() => removeSubParam(p.id, sp.id)} title="Remove Sub-Parameter" className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                 </li>
+                              ))}
+                            </ul>
+                            <form onSubmit={(e) => addSubParam(e, p.id)} className="flex gap-2">
+                               <input name="subParamText" placeholder="Add new sub-parameter..." className="flex-1 border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
+                               <button type="submit" className="bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex items-center gap-2"><Plus size={16}/> Add</button>
+                            </form>
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
             )}
 
