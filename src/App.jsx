@@ -22,6 +22,8 @@ const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0
 const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
 const Activity = (p) => <IconWrapper {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconWrapper>;
 const Edit = (p) => <IconWrapper {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></IconWrapper>;
+const FileText = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></IconWrapper>;
+const FileSpreadsheet = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -60,7 +62,7 @@ export default function App() {
   const [selectedZone, setSelectedZone] = useState(null);
   const [loginError, setLoginError] = useState('');
 
-  // Real-time Cloud Sync for Params & Personnel
+  // Fetch from Firebase automatically
   useEffect(() => {
     const unsubParams = onSnapshot(doc(db, "settings", "parameters"), (docSnap) => {
       if (docSnap.exists()) setParams(docSnap.data().paramsList);
@@ -88,6 +90,70 @@ export default function App() {
     } else {
       setLoginError('Incorrect password. Please try again.');
     }
+  };
+
+  // --- EXPORT FUNCTIONS ---
+  const exportAnalyticsExcel = () => {
+    let rows = [
+      ["KLSM Workplace Inspection Hub - Analytics Report"],
+      [],
+      ["Zone Performance Overview"],
+      ["Zone", "Last Inspected", "Issues Found", "Compliance Rate", "Status"]
+    ];
+    
+    initialZones.forEach((zone, idx) => {
+      const compliance = 100 - (idx * 5);
+      const issues = idx > 5 ? (idx * 2) - 5 : 0;
+      const status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
+      rows.push([`"${zone}"`, "Today 10:00 AM", issues, `${compliance}%`, status]);
+    });
+    
+    rows.push([]);
+    rows.push(["Personnel Completion Performance"]);
+    rows.push(["Inspector", "Assigned Zones", "Target Freq.", "Today's Progress", "Status"]);
+    
+    personnel.filter(p => p.role === 'Inspector').forEach(p => {
+      rows.push([`"${p.name}"`, `"${p.zones.join(', ')}"`, `"${p.freq}"`, "1/2", "In Progress"]);
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "KLSM_Analytics_Report.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportFormExcel = () => {
+    let rows = [
+      ["KLSM Workplace Inspection Hub - Inspection Report"],
+      ["Zone", `"${selectedZone}"`],
+      ["Inspector", `"${currentUser?.name}"`],
+      ["Date", new Date().toLocaleDateString()],
+      [],
+      ["Category", "Parameter Checklist", "Status (Memuaskan/Tidak/NA)", "Remarks / Photo Link"]
+    ];
+    
+    params.forEach(p => {
+      if (p.subParams.length > 0) {
+        p.subParams.forEach(sp => {
+          rows.push([`"${p.name}"`, `"${sp.text}"`, "", ""]);
+        });
+      } else {
+        rows.push([`"${p.name}"`, "General Check", "", ""]);
+      }
+    });
+    
+    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Inspection_Form_${selectedZone?.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // --- PERSONNEL MANAGEMENT ---
@@ -126,9 +192,7 @@ export default function App() {
     }
   };
 
-  // --- PARAMETER MANAGEMENT (ADD, EDIT, DELETE) ---
-  
-  // 1. Main Parameters
+  // --- PARAMETER MANAGEMENT ---
   const addMainParam = async (e) => {
     e.preventDefault();
     const text = e.target.mainParamText.value.trim();
@@ -150,14 +214,13 @@ export default function App() {
   };
 
   const deleteMainParam = async (paramId) => {
-    if(window.confirm("Are you sure you want to delete this entire category and all its sub-parameters?")) {
+    if(window.confirm("Are you sure you want to delete this entire category?")) {
       const updatedParams = params.filter(p => p.id !== paramId);
       setParams(updatedParams);
       await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
     }
   };
 
-  // 2. Sub-Parameters
   const addSubParam = async (e, paramId) => {
     e.preventDefault();
     const text = e.target.subParamText.value.trim();
@@ -209,8 +272,16 @@ export default function App() {
       results: {}
     };
 
+    // Gather results specifically for every sub-parameter
     params.forEach(p => {
-      inspectionData.results[p.name] = formData.get(`status-${p.id}`);
+      if (p.subParams.length > 0) {
+        p.subParams.forEach(sp => {
+          inspectionData.results[`${p.name} - ${sp.text}`] = formData.get(`status-${p.id}-${sp.id}`);
+        });
+      } else {
+        // Fallback if there are no sub-parameters for this category
+        inspectionData.results[p.name] = formData.get(`status-${p.id}`);
+      }
     });
 
     try {
@@ -228,7 +299,7 @@ export default function App() {
     : initialZones.filter(z => currentUser?.zones.includes(z));
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 print:block print:bg-white">
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center w-full">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600">
@@ -259,7 +330,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen">
+          <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
               <h1 className="text-lg md:text-xl font-black text-orange-500 tracking-tight hidden md:block">KLSM Hub</h1>
@@ -292,7 +363,7 @@ export default function App() {
             </button>
           </aside>
 
-          <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50 w-full">
+          <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50 w-full print:bg-white print:m-0 print:p-0 print:w-full">
             {activeTab === 'dashboard' && (
               <div className="max-w-7xl mx-auto">
                 <h2 className="text-xl md:text-2xl font-black mb-6 text-slate-900">Your Assigned Zones</h2>
@@ -315,32 +386,43 @@ export default function App() {
 
             {activeTab === 'admin-analytics' && (
               <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-                <h2 className="text-xl md:text-2xl font-black text-slate-900">Analytics & Performance</h2>
                 
-                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Personnel Completion Performance</h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
+                  <h2 className="text-xl md:text-2xl font-black text-slate-900">Analytics & Performance</h2>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                     <button onClick={exportAnalyticsExcel} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                        <FileSpreadsheet size={16}/> Export Excel
+                     </button>
+                     <button onClick={() => window.print()} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                        <FileText size={16}/> Save PDF
+                     </button>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
+                  <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Completion Performance</h3>
                   <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                     <table className="w-full text-sm text-left min-w-[600px]">
-                      <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
+                      <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black print:bg-white print:text-black print:border-b-2 print:border-black">
                         <tr><th className="p-3 md:p-4 rounded-tl-xl">Inspector</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Today's Progress</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 print:divide-slate-300">
                         {personnel.filter(p => p.role === 'Inspector').map(p => (
                           <tr key={p.id} className="hover:bg-slate-50/50">
                             <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
                             <td className="p-3 md:p-4 text-slate-600">
                               <div className="flex flex-wrap gap-1">
-                                {p.zones.map(z => <span key={z} className="bg-slate-100 px-2 py-1 rounded text-xs">{z.split('–')[0]}</span>)}
+                                {p.zones.map(z => <span key={z} className="bg-slate-100 px-2 py-1 rounded text-xs print:bg-white print:border print:border-slate-300">{z.split('–')[0]}</span>)}
                               </div>
                             </td>
                             <td className="p-3 md:p-4 font-medium">{p.freq}</td>
                             <td className="p-3 md:p-4">
                               <div className="flex items-center gap-2">
-                                <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px]"><div className="bg-orange-500 h-2.5 rounded-full" style={{width: '50%'}}></div></div>
-                                <span className="text-xs font-bold text-slate-500">1/2</span>
+                                <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden"><div className="bg-orange-500 h-2.5 rounded-full" style={{width: '50%'}}></div></div>
+                                <span className="text-xs font-bold text-slate-500 print:text-black">1/2</span>
                               </div>
                             </td>
-                            <td className="p-3 md:p-4"><span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg">In Progress</span></td>
+                            <td className="p-3 md:p-4"><span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg print:border print:border-black print:bg-white print:text-black">In Progress</span></td>
                           </tr>
                         ))}
                       </tbody>
@@ -348,35 +430,35 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600"/> Zone Performance Overview</h3>
+                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
+                  <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600 print:text-black"/> Zone Performance Overview</h3>
                   <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                     <table className="w-full text-sm text-left min-w-[600px]">
-                      <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
+                      <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black print:bg-white print:text-black print:border-b-2 print:border-black">
                         <tr><th className="p-3 md:p-4 rounded-tl-xl">Zone</th><th className="p-3 md:p-4">Last Inspected</th><th className="p-3 md:p-4">Issues Found</th><th className="p-3 md:p-4">Compliance Rate</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 print:divide-slate-300">
                         {initialZones.map((zone, idx) => {
                           const compliance = 100 - (idx * 5);
                           const issues = idx > 5 ? (idx * 2) - 5 : 0; 
                           const status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
                           const statusColors = {
-                             'Good': 'bg-emerald-100 text-emerald-700',
-                             'Warning': 'bg-amber-100 text-amber-700',
-                             'Critical': 'bg-red-100 text-red-700'
+                             'Good': 'bg-emerald-100 text-emerald-700 print:border print:border-black print:bg-white print:text-black',
+                             'Warning': 'bg-amber-100 text-amber-700 print:border print:border-black print:bg-white print:text-black',
+                             'Critical': 'bg-red-100 text-red-700 print:border print:border-black print:bg-white print:text-black'
                           };
                           
                           return (
                             <tr key={idx} className="hover:bg-slate-50/50">
-                              <td className="p-3 md:p-4 font-bold text-slate-800 max-w-[200px] truncate" title={zone}>{zone}</td>
-                              <td className="p-3 md:p-4 text-slate-600">Today, 10:00 AM</td>
-                              <td className="p-3 md:p-4 font-medium">{issues > 0 ? <span className="text-red-600">{issues}</span> : <span className="text-slate-400">0</span>}</td>
+                              <td className="p-3 md:p-4 font-bold text-slate-800 max-w-[200px] truncate print:whitespace-normal" title={zone}>{zone}</td>
+                              <td className="p-3 md:p-4 text-slate-600 print:text-black">Today, 10:00 AM</td>
+                              <td className="p-3 md:p-4 font-medium">{issues > 0 ? <span className="text-red-600 print:text-black">{issues}</span> : <span className="text-slate-400 print:text-black">0</span>}</td>
                               <td className="p-3 md:p-4">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px]">
+                                  <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
                                     <div className={`h-2.5 rounded-full ${compliance >= 90 ? 'bg-emerald-500' : (compliance >= 70 ? 'bg-amber-500' : 'bg-red-500')}`} style={{width: `${compliance}%`}}></div>
                                   </div>
-                                  <span className="text-xs font-bold text-slate-500">{compliance}%</span>
+                                  <span className="text-xs font-bold text-slate-500 print:text-black">{compliance}%</span>
                                 </div>
                               </td>
                               <td className="p-3 md:p-4"><span className={`px-2 py-1 text-xs font-bold rounded-lg ${statusColors[status]}`}>{status}</span></td>
@@ -512,56 +594,80 @@ export default function App() {
             )}
 
             {activeTab === 'inspection-form' && (
-              <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto">
-                <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6">
-                   <h2 className="text-xl md:text-2xl font-black text-slate-900">Conduct Inspection</h2>
-                   <p className="text-xs md:text-sm font-bold text-orange-600 mt-1 flex items-center gap-1"><ClipboardList size={16}/> {selectedZone}</p>
+              <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto print:border-none print:shadow-none print:p-0">
+                
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6 print:border-b-2 print:border-black">
+                   <div>
+                     <h2 className="text-xl md:text-2xl font-black text-slate-900">Conduct Inspection</h2>
+                     <p className="text-xs md:text-sm font-bold text-orange-600 mt-1 flex items-center gap-1 print:text-black"><ClipboardList size={16}/> {selectedZone}</p>
+                   </div>
+                   
+                   <div className="flex gap-2 w-full sm:w-auto mt-4 sm:mt-0 print:hidden">
+                      <button onClick={exportFormExcel} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-sm font-bold transition-colors">
+                         <FileSpreadsheet size={16}/> Export Excel
+                      </button>
+                      <button onClick={() => window.print()} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl text-sm font-bold transition-colors">
+                         <FileText size={16}/> Print / Save PDF
+                      </button>
+                   </div>
                 </div>
                 
-                <form onSubmit={handleInspectionSubmit} className="space-y-6">
+                <form onSubmit={handleInspectionSubmit} className="space-y-6 print:space-y-4">
                   {params.map((p, idx) => (
-                    <div key={p.id} className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
-                      <label className="font-bold text-slate-800 block mb-2 text-base md:text-lg">{idx + 1}. {p.name}</label>
+                    <div key={p.id} className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200 print:bg-white print:border-b print:border-slate-300 print:rounded-none print:p-2">
+                      <label className="font-bold text-slate-800 block mb-3 text-base md:text-lg">{idx + 1}. {p.name}</label>
                       
-                      {/* Sub-parameters now display as a checklist guide for the inspector */}
-                      {p.subParams.length > 0 && (
-                        <ul className="mb-4 space-y-1">
-                          {p.subParams.map(sp => (
-                            <li key={sp.id} className="text-sm text-slate-600 flex items-start gap-2">
-                               <span className="text-orange-500 mt-0.5 font-black">•</span> {sp.text}
-                            </li>
+                      {p.subParams.length > 0 ? (
+                        <div className="space-y-4 print:space-y-2">
+                          {p.subParams.map((sp, spIdx) => (
+                            <div key={sp.id} className="pl-4 md:pl-6 border-l-2 border-slate-300 print:border-none print:pl-4">
+                               <p className="text-sm md:text-base font-semibold text-slate-700 mb-2">{idx + 1}.{spIdx + 1} {sp.text}</p>
+                               <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-start sm:items-center">
+                                  <select name={`status-${p.id}-${sp.id}`} className="w-full sm:w-auto p-2 md:p-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none print:border-none print:p-0 print:appearance-none" defaultValue="" required>
+                                     <option value="" disabled className="print:hidden">Pilih Status...</option>
+                                     <option value="Memuaskan">🟢 Memuaskan</option>
+                                     <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
+                                     <option value="N/A">⚪ N/A</option>
+                                  </select>
+                                  
+                                  <label className="flex items-center justify-center gap-2 w-full sm:w-auto bg-white border border-slate-300 text-slate-600 px-4 py-2 md:py-2.5 rounded-lg text-sm font-bold hover:bg-slate-100 transition-colors cursor-pointer print:hidden">
+                                     <Camera size={16}/> Add Photo
+                                     <input type="file" name={`photo-${p.id}-${sp.id}`} accept="image/*" capture="environment" className="hidden" />
+                                  </label>
+                               </div>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-start sm:items-center">
+                          <select name={`status-${p.id}`} className="w-full sm:w-auto p-2 md:p-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none print:border-none print:p-0 print:appearance-none" defaultValue="" required>
+                             <option value="" disabled className="print:hidden">Pilih Status...</option>
+                             <option value="Memuaskan">🟢 Memuaskan</option>
+                             <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
+                             <option value="N/A">⚪ N/A</option>
+                          </select>
+                          
+                          <label className="flex items-center justify-center gap-2 w-full sm:w-auto bg-white border border-slate-300 text-slate-600 px-4 py-2 md:py-2.5 rounded-lg text-sm font-bold hover:bg-slate-100 transition-colors cursor-pointer print:hidden">
+                             <Camera size={16}/> Add Photo
+                             <input type="file" name={`photo-${p.id}`} accept="image/*" capture="environment" className="hidden" />
+                          </label>
+                        </div>
                       )}
-
-                      <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-start sm:items-center">
-                        <select name={`status-${p.id}`} className="w-full sm:w-auto p-2 md:p-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="" required>
-                           <option value="" disabled>Select Status...</option>
-                           <option value="Pass">🟢 Pass</option>
-                           <option value="Fail">🔴 Fail</option>
-                           <option value="NA">⚪ N/A</option>
-                        </select>
-                        
-                        <label className="flex items-center justify-center gap-2 w-full sm:w-auto bg-white border border-slate-300 text-slate-600 px-4 py-2 md:py-2.5 rounded-lg text-sm font-bold hover:bg-slate-100 transition-colors cursor-pointer">
-                           <Camera size={16}/> Add Photo
-                           <input type="file" accept="image/*" capture="environment" className="hidden" />
-                        </label>
-                      </div>
                     </div>
                   ))}
                   
-                  <div className="p-4 md:p-5 bg-orange-50 rounded-xl border border-orange-200 mt-8">
-                     <label className="font-black text-orange-900 block mb-2 text-base md:text-lg">Overall Remarks / Corrective Actions</label>
-                     <p className="text-xs text-orange-700 mb-3 font-medium">Add any general observations or details regarding failed parameters that require immediate attention.</p>
+                  <div className="p-4 md:p-5 bg-orange-50 rounded-xl border border-orange-200 mt-8 print:bg-white print:border print:border-black">
+                     <label className="font-black text-orange-900 block mb-2 text-base md:text-lg print:text-black">Overall Remarks / Corrective Actions</label>
+                     <p className="text-xs text-orange-700 mb-3 font-medium print:hidden">Add any general observations or details regarding failed parameters that require immediate attention.</p>
                      <textarea 
                         name="remarks"
-                        className="w-full p-3 md:p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white" 
+                        className="w-full p-3 md:p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white print:border-none print:p-0" 
                         rows="4" 
                         placeholder="Type your remarks here..."
                      ></textarea>
                   </div>
 
-                  <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4">
+                  <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4 print:hidden">
                      <button type="button" onClick={() => setActiveTab('dashboard')} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
                      <button type="submit" className="w-full sm:w-2/3 bg-orange-600 text-white py-3 rounded-xl font-black text-base md:text-lg hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-all">Submit Inspection</button>
                   </div>
