@@ -58,17 +58,30 @@ export default function App() {
   const [selectedZone, setSelectedZone] = useState(null);
   const [loginError, setLoginError] = useState('');
 
-  // Fetch parameters from Firebase
+  // Fetch both Parameters and Personnel from Firebase automatically
   useEffect(() => {
-    const docRef = doc(db, "settings", "parameters");
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    // 1. Listen for Parameters
+    const unsubParams = onSnapshot(doc(db, "settings", "parameters"), (docSnap) => {
       if (docSnap.exists()) {
         setParams(docSnap.data().paramsList);
       } else {
-        setDoc(docRef, { paramsList: initialParameters });
+        setDoc(doc(db, "settings", "parameters"), { paramsList: initialParameters });
       }
     });
-    return () => unsubscribe();
+
+    // 2. Listen for Personnel
+    const unsubPersonnel = onSnapshot(doc(db, "settings", "personnel"), (docSnap) => {
+      if (docSnap.exists()) {
+        setPersonnel(docSnap.data().personnelList);
+      } else {
+        setDoc(doc(db, "settings", "personnel"), { personnelList: initialUsers });
+      }
+    });
+
+    return () => {
+      unsubParams();
+      unsubPersonnel();
+    };
   }, []);
 
   const handleLogin = (e) => {
@@ -86,7 +99,8 @@ export default function App() {
     }
   };
 
-  const addPersonnel = (e) => {
+  // UPDATED: Now saves to Cloud
+  const addPersonnel = async (e) => {
     e.preventDefault();
     const checkedZones = Array.from(e.target.zone)
       .filter(checkbox => checkbox.checked)
@@ -100,15 +114,30 @@ export default function App() {
       freq: e.target.freq.value,
       password: e.target.password.value
     };
-    setPersonnel([...personnel, newPerson]);
+    
+    const updatedPersonnel = [...personnel, newPerson];
+    setPersonnel(updatedPersonnel); // Update screen instantly
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel }); // Save permanently
     e.target.reset();
   };
 
-  const resetPassword = (userId) => {
+  // UPDATED: Now saves to Cloud
+  const resetPassword = async (userId) => {
     const newPass = prompt("Enter new password for this user:");
     if (newPass) {
-      setPersonnel(personnel.map(p => p.id === userId ? { ...p, password: newPass } : p));
+      const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, password: newPass } : p);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
       alert("Password updated successfully.");
+    }
+  };
+
+  // UPDATED: Now saves to Cloud
+  const deleteUser = async (userId) => {
+    if(window.confirm("Are you sure you want to remove this user?")) {
+      const updatedPersonnel = personnel.filter(u => u.id !== userId);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
     }
   };
 
@@ -397,7 +426,7 @@ export default function App() {
                           <td className="p-3 md:p-4 text-right">
                              <div className="flex justify-end gap-2">
                                <button onClick={() => resetPassword(p.id)} title="Reset Password" className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Key size={16}/></button>
-                               <button onClick={() => setPersonnel(personnel.filter(u => u.id !== p.id))} title="Delete User" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                               <button onClick={() => deleteUser(p.id)} title="Delete User" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
                              </div>
                           </td>
                         </tr>
