@@ -23,6 +23,7 @@ const FileSpreadsheet = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-
 const Eye = (p) => <IconWrapper {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></IconWrapper>;
 const ArrowLeft = (p) => <IconWrapper {...p}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></IconWrapper>;
 const Pencil = (p) => <IconWrapper {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconWrapper>;
+const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -59,6 +60,7 @@ export default function App() {
   const [params, setParams] = useState(initialParameters);
   const [personnel, setPersonnel] = useState(initialUsers);
   const [inspections, setInspections] = useState([]);
+  const [accidents, setAccidents] = useState([]);
   
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
@@ -93,7 +95,12 @@ export default function App() {
       setInspections(data);
     });
 
-    return () => { unsubParams(); unsubPersonnel(); unsubInspections(); };
+    const unsubAccidents = onSnapshot(collection(db, "accidents"), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAccidents(data);
+    });
+
+    return () => { unsubParams(); unsubPersonnel(); unsubInspections(); unsubAccidents(); };
   }, []);
 
   const handleLogin = (e) => {
@@ -131,11 +138,14 @@ export default function App() {
     showToast("New personnel added to cloud.");
   };
 
-  const resetPassword = async (userId) => {
-    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, password: "1234" } : p);
-    setPersonnel(updatedPersonnel);
-    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
-    showToast("Password reset to default '1234'");
+  const editPassword = async (userId) => {
+    const newPass = prompt("Enter new password for this user:");
+    if (newPass && newPass.trim() !== "") {
+      const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, password: newPass } : p);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+      showToast("Password updated successfully.");
+    }
   };
 
   const deleteUser = async (userId) => {
@@ -180,7 +190,6 @@ export default function App() {
     await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
   };
 
-  // The inline editing function that saves changes straight to Firebase
   const saveEdit = async () => {
     if (!editingItem.text.trim()) {
       setEditingItem({ id: null, subId: null, text: '' });
@@ -189,10 +198,8 @@ export default function App() {
 
     let updatedParams;
     if (editingItem.subId === null) {
-      // Editing a Main Parameter
       updatedParams = params.map(p => p.id === editingItem.id ? { ...p, name: editingItem.text } : p);
     } else {
-      // Editing a Sub Parameter
       updatedParams = params.map(p => {
         if (p.id === editingItem.id) {
           return {
@@ -215,7 +222,6 @@ export default function App() {
     const formData = new FormData(e.target);
     const results = {};
     
-    // Extract dynamic answers for each sub-parameter in the form
     for (let [key, value] of formData.entries()) {
       if (key.startsWith('res-')) {
         const questionName = key.replace('res-', '');
@@ -241,6 +247,29 @@ export default function App() {
     }
   };
 
+  const handleAccidentSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+
+    const accidentData = {
+      accidentDate: formData.get('accidentDate'),
+      injuredPerson: formData.get('injuredPerson') || "None",
+      damage: formData.get('damage') || "None",
+      details: formData.get('details'),
+      reportedBy: currentUser.name,
+      reportedAt: new Date().toISOString()
+    };
+
+    try {
+      await addDoc(collection(db, "accidents"), accidentData);
+      showToast('🚨 Accident Report Submitted Successfully!');
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error("Error adding accident report: ", error);
+      showToast('❌ Error submitting report.');
+    }
+  };
+
   const exportToExcel = () => {
     if (inspections.length === 0) {
       showToast("No data to export.");
@@ -252,9 +281,25 @@ export default function App() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'KLSM_Historical_Records.csv';
+    a.download = 'KLSM_Historical_Inspections.csv';
     a.click();
     showToast("Excel downloaded!");
+  };
+
+  const exportAccidentsToExcel = () => {
+    if (accidents.length === 0) {
+      showToast("No accident data to export.");
+      return;
+    }
+    const headers = "Reported Date,Date of Accident,Injured Person & MC,Property/Equipment Damage,Accident Details,Reported By\n";
+    const rows = accidents.map(a => `"${new Date(a.reportedAt).toLocaleString()}","${new Date(a.accidentDate).toLocaleString().replace(',', '')}","${(a.injuredPerson||'').replace(/"/g, '""')}","${(a.damage||'').replace(/"/g, '""')}","${(a.details||'').replace(/"/g, '""')}","${a.reportedBy}"`).join("\n");
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'KLSM_Accident_Reports.csv';
+    a.click();
+    showToast("Accident Excel downloaded!");
   };
 
   const displayedZones = currentUser?.role.includes('Admin') ? initialZones : initialZones.filter(z => currentUser?.zones.includes(z));
@@ -274,7 +319,7 @@ export default function App() {
         <div className="min-h-screen bg-slate-900 flex items-center justify-center w-full">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600">
             <ShieldAlert className="mx-auto text-orange-600 mb-4" size={48} />
-            <h1 className="text-2xl font-black mb-2 text-slate-900 tracking-tight">KLSM Workplace Inspection</h1>
+            <h1 className="text-2xl font-black mb-2 text-slate-900 tracking-tight">KLSM Inspection Hub</h1>
             <p className="text-sm text-slate-500 mb-6 font-medium">Authorized Personnel Only</p>
             
             {loginError && <div className="mb-4 p-2 bg-red-50 text-red-600 text-sm rounded-lg font-semibold border border-red-200">{loginError}</div>}
@@ -306,6 +351,10 @@ export default function App() {
             <nav className="flex flex-row md:flex-col space-y-0 md:space-y-2 space-x-2 md:space-x-0 flex-1 overflow-x-auto no-scrollbar items-center md:items-stretch">
               <button onClick={() => setActiveTab('dashboard')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                 <LayoutDashboard size={20}/> <span className="text-sm md:text-base">Dashboard</span>
+              </button>
+
+              <button onClick={() => setActiveTab('accident-report')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'accident-report' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                <AlertTriangle size={20}/> <span className="text-sm md:text-base">Report Accident</span>
               </button>
               
               {currentUser?.role.includes('Admin') && (
@@ -352,14 +401,59 @@ export default function App() {
               </div>
             )}
 
+            {/* Accident Reporting Form */}
+            {activeTab === 'accident-report' && (
+              <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto border-t-4 border-t-red-600">
+                <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6">
+                   <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Report an Accident / Incident</h2>
+                   <p className="text-xs md:text-sm font-medium text-slate-500 mt-1">Please fill out the following details as accurately as possible.</p>
+                </div>
+                
+                <form onSubmit={handleAccidentSubmit} className="space-y-6">
+                  <div className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
+                    <label className="font-bold text-slate-800 block mb-2 text-sm md:text-base">1. Date & Time of Accident</label>
+                    <input type="datetime-local" name="accidentDate" className="w-full p-3 border border-slate-300 rounded-lg font-medium text-slate-700 focus:ring-2 focus:ring-red-500 outline-none bg-white" required />
+                  </div>
+
+                  <div className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
+                    <label className="font-bold text-slate-800 block mb-2 text-sm md:text-base">2. Injured Person Involved (if any)</label>
+                    <p className="text-xs text-slate-500 mb-3">Please include name and days of MC if applicable.</p>
+                    <input type="text" name="injuredPerson" placeholder="E.g. Ali Bin Abu - 3 Days MC" className="w-full p-3 border border-slate-300 rounded-lg font-medium text-slate-700 focus:ring-2 focus:ring-red-500 outline-none bg-white" />
+                  </div>
+
+                  <div className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
+                    <label className="font-bold text-slate-800 block mb-2 text-sm md:text-base">3. Property or Equipment Damage (if any)</label>
+                    <input type="text" name="damage" placeholder="E.g. Forklift front bumper dented" className="w-full p-3 border border-slate-300 rounded-lg font-medium text-slate-700 focus:ring-2 focus:ring-red-500 outline-none bg-white" />
+                  </div>
+
+                  <div className="p-4 md:p-5 bg-red-50 rounded-xl border border-red-200 mt-8">
+                     <label className="font-black text-red-900 block mb-2 text-base md:text-lg">4. Accident Details</label>
+                     <p className="text-xs text-red-700 mb-3 font-medium">Provide a full description of how the accident occurred.</p>
+                     <textarea 
+                        name="details"
+                        className="w-full p-3 md:p-4 border border-red-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-white" 
+                        rows="5" 
+                        placeholder="Describe the incident in detail..."
+                        required
+                     ></textarea>
+                  </div>
+
+                  <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4">
+                     <button type="button" onClick={() => setActiveTab('dashboard')} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
+                     <button type="submit" className="w-full sm:w-2/3 bg-red-600 text-white py-3 rounded-xl font-black text-base md:text-lg hover:bg-red-700 shadow-lg shadow-red-600/30 transition-all">Submit Accident Report</button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             {/* Admin Analytics Panel */}
             {activeTab === 'admin-analytics' && (
               <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-                <div className="flex justify-between items-center print:hidden">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
                    <h2 className="text-xl md:text-2xl font-black text-slate-900">Analytics & History</h2>
-                   <div className="flex gap-2">
+                   <div className="flex flex-wrap gap-2">
                      <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
-                        <FileSpreadsheet size={16}/> Export Excel
+                        <FileSpreadsheet size={16}/> Export Inspections
                      </button>
                      <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
                         <FileText size={16}/> Save Dashboard PDF
@@ -367,6 +461,35 @@ export default function App() {
                    </div>
                 </div>
                 
+                {/* Accident Records Table */}
+                <div className="bg-white p-4 md:p-6 rounded-2xl border border-red-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                    <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600 print:text-black"/> Accident & Incident Records</h3>
+                    <button onClick={exportAccidentsToExcel} className="flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors print:hidden">
+                        <FileSpreadsheet size={14}/> Export Accidents
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                    <table className="w-full text-sm text-left min-w-[800px]">
+                      <thead className="bg-red-50 text-red-800 uppercase text-xs font-black print:bg-white print:text-black">
+                        <tr><th className="p-3 md:p-4 rounded-tl-xl">Date of Accident</th><th className="p-3 md:p-4">Reported By</th><th className="p-3 md:p-4">Injured Person & MC</th><th className="p-3 md:p-4">Property Damage</th><th className="p-3 md:p-4 rounded-tr-xl">Details</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 print:divide-slate-300">
+                        {accidents.sort((a,b) => new Date(b.reportedAt) - new Date(a.reportedAt)).map(acc => (
+                          <tr key={acc.id} className="hover:bg-slate-50/50">
+                            <td className="p-3 md:p-4 font-bold text-slate-800 whitespace-nowrap">{new Date(acc.accidentDate).toLocaleString()}</td>
+                            <td className="p-3 md:p-4 font-medium text-slate-600 whitespace-nowrap">{acc.reportedBy}</td>
+                            <td className="p-3 md:p-4">{acc.injuredPerson}</td>
+                            <td className="p-3 md:p-4 text-slate-600">{acc.damage}</td>
+                            <td className="p-3 md:p-4 text-xs text-slate-500 max-w-xs truncate" title={acc.details}>{acc.details}</td>
+                          </tr>
+                        ))}
+                        {accidents.length === 0 && <tr><td colSpan="5" className="p-4 text-center text-slate-500 italic font-medium">No accidents reported.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                   <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
                   <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -459,8 +582,8 @@ export default function App() {
                 </div>
 
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
-                  <h3 className="font-bold text-base md:text-lg mb-2 text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Records</h3>
-                  <p className="text-xs text-slate-500 mb-4 font-medium">Access all previously submitted forms here.</p>
+                  <h3 className="font-bold text-base md:text-lg mb-2 text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Inspection Records</h3>
+                  <p className="text-xs text-slate-500 mb-4 font-medium">Access all previously submitted inspection forms here.</p>
                   <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                     <table className="w-full text-sm text-left min-w-[600px]">
                       <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
@@ -590,7 +713,7 @@ export default function App() {
                           <td className="p-3 md:p-4 font-medium">{p.freq}</td>
                           <td className="p-3 md:p-4 text-right">
                              <div className="flex justify-end gap-2">
-                               <button onClick={() => resetPassword(p.id)} title="Reset Password to 1234" className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Key size={16}/></button>
+                               <button onClick={() => editPassword(p.id)} title="Edit Password" className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Key size={16}/></button>
                                <button onClick={() => deleteUser(p.id)} title="Delete User" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
                              </div>
                           </td>
