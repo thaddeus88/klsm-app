@@ -2,6 +2,7 @@
 import { db } from './firebase'; 
 import { collection, addDoc, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
+// Icons
 const IconWrapper = ({ children, size = 24, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     {children}
@@ -20,6 +21,7 @@ const UserPlus = (p) => <IconWrapper {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4
 const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
 const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
 const Activity = (p) => <IconWrapper {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconWrapper>;
+const Edit = (p) => <IconWrapper {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -58,30 +60,19 @@ export default function App() {
   const [selectedZone, setSelectedZone] = useState(null);
   const [loginError, setLoginError] = useState('');
 
-  // Fetch both Parameters and Personnel from Firebase automatically
+  // Real-time Cloud Sync for Params & Personnel
   useEffect(() => {
-    // 1. Listen for Parameters
     const unsubParams = onSnapshot(doc(db, "settings", "parameters"), (docSnap) => {
-      if (docSnap.exists()) {
-        setParams(docSnap.data().paramsList);
-      } else {
-        setDoc(doc(db, "settings", "parameters"), { paramsList: initialParameters });
-      }
+      if (docSnap.exists()) setParams(docSnap.data().paramsList);
+      else setDoc(doc(db, "settings", "parameters"), { paramsList: initialParameters });
     });
 
-    // 2. Listen for Personnel
     const unsubPersonnel = onSnapshot(doc(db, "settings", "personnel"), (docSnap) => {
-      if (docSnap.exists()) {
-        setPersonnel(docSnap.data().personnelList);
-      } else {
-        setDoc(doc(db, "settings", "personnel"), { personnelList: initialUsers });
-      }
+      if (docSnap.exists()) setPersonnel(docSnap.data().personnelList);
+      else setDoc(doc(db, "settings", "personnel"), { personnelList: initialUsers });
     });
 
-    return () => {
-      unsubParams();
-      unsubPersonnel();
-    };
+    return () => { unsubParams(); unsubPersonnel(); };
   }, []);
 
   const handleLogin = (e) => {
@@ -99,13 +90,10 @@ export default function App() {
     }
   };
 
-  // UPDATED: Now saves to Cloud
+  // --- PERSONNEL MANAGEMENT ---
   const addPersonnel = async (e) => {
     e.preventDefault();
-    const checkedZones = Array.from(e.target.zone)
-      .filter(checkbox => checkbox.checked)
-      .map(checkbox => checkbox.value);
-
+    const checkedZones = Array.from(e.target.zone).filter(cb => cb.checked).map(cb => cb.value);
     const newPerson = {
       id: Date.now(),
       name: e.target.name.value,
@@ -114,14 +102,12 @@ export default function App() {
       freq: e.target.freq.value,
       password: e.target.password.value
     };
-    
     const updatedPersonnel = [...personnel, newPerson];
-    setPersonnel(updatedPersonnel); // Update screen instantly
-    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel }); // Save permanently
+    setPersonnel(updatedPersonnel);
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
     e.target.reset();
   };
 
-  // UPDATED: Now saves to Cloud
   const resetPassword = async (userId) => {
     const newPass = prompt("Enter new password for this user:");
     if (newPass) {
@@ -132,7 +118,6 @@ export default function App() {
     }
   };
 
-  // UPDATED: Now saves to Cloud
   const deleteUser = async (userId) => {
     if(window.confirm("Are you sure you want to remove this user?")) {
       const updatedPersonnel = personnel.filter(u => u.id !== userId);
@@ -141,35 +126,77 @@ export default function App() {
     }
   };
 
-  const addSubParam = async (e, paramId) => {
+  // --- PARAMETER MANAGEMENT (ADD, EDIT, DELETE) ---
+  
+  // 1. Main Parameters
+  const addMainParam = async (e) => {
     e.preventDefault();
-    const text = e.target.subParamText.value.trim();
+    const text = e.target.mainParamText.value.trim();
     if (!text) return;
-    
-    const updatedParams = params.map(p => {
-      if (p.id === paramId) {
-        return { ...p, subParams: [...p.subParams, { id: Date.now(), text }] };
-      }
-      return p;
-    });
-
+    const newParam = { id: Date.now(), name: text, subParams: [] };
+    const updatedParams = [...params, newParam];
     setParams(updatedParams);
     await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
     e.target.reset();
   };
 
-  const removeSubParam = async (paramId, subParamId) => {
-    const updatedParams = params.map(p => {
-      if (p.id === paramId) {
-        return { ...p, subParams: p.subParams.filter(sp => sp.id !== subParamId) };
-      }
-      return p;
-    });
-
-    setParams(updatedParams);
-    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+  const editMainParam = async (paramId, currentName) => {
+    const newName = prompt("Edit Main Category name:", currentName);
+    if (newName && newName.trim() !== "") {
+      const updatedParams = params.map(p => p.id === paramId ? { ...p, name: newName.trim() } : p);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    }
   };
 
+  const deleteMainParam = async (paramId) => {
+    if(window.confirm("Are you sure you want to delete this entire category and all its sub-parameters?")) {
+      const updatedParams = params.filter(p => p.id !== paramId);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    }
+  };
+
+  // 2. Sub-Parameters
+  const addSubParam = async (e, paramId) => {
+    e.preventDefault();
+    const text = e.target.subParamText.value.trim();
+    if (!text) return;
+    const updatedParams = params.map(p => {
+      if (p.id === paramId) return { ...p, subParams: [...p.subParams, { id: Date.now(), text }] };
+      return p;
+    });
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    e.target.reset();
+  };
+
+  const editSubParam = async (paramId, subParamId, currentText) => {
+    const newText = prompt("Edit Sub-Parameter:", currentText);
+    if (newText && newText.trim() !== "") {
+      const updatedParams = params.map(p => {
+        if (p.id === paramId) {
+          return { ...p, subParams: p.subParams.map(sp => sp.id === subParamId ? { ...sp, text: newText.trim() } : sp) };
+        }
+        return p;
+      });
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    }
+  };
+
+  const removeSubParam = async (paramId, subParamId) => {
+    if(window.confirm("Delete this sub-parameter?")) {
+      const updatedParams = params.map(p => {
+        if (p.id === paramId) return { ...p, subParams: p.subParams.filter(sp => sp.id !== subParamId) };
+        return p;
+      });
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    }
+  };
+
+  // --- SUBMIT INSPECTION ---
   const handleInspectionSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -438,14 +465,20 @@ export default function App() {
 
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <h3 className="font-bold text-base md:text-lg mb-2 flex items-center gap-2 text-slate-800"><ClipboardList className="text-orange-600"/> Parameter Management</h3>
-                  <p className="text-sm text-slate-500 mb-6">Manage sub-parameters. Changes save automatically to the cloud.</p>
+                  <p className="text-sm text-slate-500 mb-6">Manage all main categories and their checklists. Edits save in real-time to the cloud.</p>
                   
                   <div className="space-y-4">
-                    {params.map(p => (
+                    {params.map((p, idx) => (
                       <div key={p.id} className="border border-slate-200 rounded-xl overflow-hidden">
                          <div className="bg-slate-50 p-3 md:p-4 border-b border-slate-200 font-bold text-slate-800 flex justify-between items-center text-sm md:text-base">
-                            <span>{p.id}. {p.name}</span>
-                            <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{p.subParams.length} items</span>
+                            <div className="flex items-center gap-2">
+                               <span>{idx + 1}. {p.name}</span>
+                               <button onClick={() => editMainParam(p.id, p.name)} title="Edit Category Name" className="text-slate-400 hover:text-blue-600 transition-colors"><Edit size={16}/></button>
+                            </div>
+                            <div className="flex items-center gap-3">
+                               <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500 hidden sm:inline-block">{p.subParams.length} items</span>
+                               <button onClick={() => deleteMainParam(p.id)} title="Delete Entire Category" className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                            </div>
                          </div>
                          <div className="p-3 md:p-4 bg-white">
                             <ul className="space-y-2 mb-4">
@@ -453,18 +486,27 @@ export default function App() {
                               {p.subParams.map(sp => (
                                  <li key={sp.id} className="flex justify-between items-center bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100 text-xs md:text-sm font-medium text-slate-700">
                                    <span>{sp.text}</span>
-                                   <button onClick={() => removeSubParam(p.id, sp.id)} title="Remove Sub-Parameter" className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                   <div className="flex gap-2">
+                                     <button onClick={() => editSubParam(p.id, sp.id, sp.text)} title="Edit Sub-Parameter" className="text-slate-400 hover:text-blue-600 transition-colors"><Edit size={16}/></button>
+                                     <button onClick={() => removeSubParam(p.id, sp.id)} title="Remove Sub-Parameter" className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                   </div>
                                  </li>
                               ))}
                             </ul>
                             <form onSubmit={(e) => addSubParam(e, p.id)} className="flex flex-col sm:flex-row gap-2">
-                               <input name="subParamText" placeholder="Add new sub-parameter..." className="flex-1 border border-slate-300 p-2 md:p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
-                               <button type="submit" className="w-full sm:w-auto bg-slate-900 text-white px-4 py-2 md:py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Add</button>
+                               <input name="subParamText" placeholder="Add new checklist item..." className="flex-1 border border-slate-300 p-2 md:p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
+                               <button type="submit" className="w-full sm:w-auto bg-slate-900 text-white px-4 py-2 md:py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Add Item</button>
                             </form>
                          </div>
                       </div>
                     ))}
                   </div>
+
+                  {/* Add New Main Parameter Form */}
+                  <form onSubmit={addMainParam} className="mt-6 flex flex-col sm:flex-row gap-2 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+                     <input name="mainParamText" placeholder="Add a brand new Main Category..." className="flex-1 border border-orange-300 p-2 md:p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white" required />
+                     <button type="submit" className="w-full sm:w-auto bg-orange-600 text-white px-4 py-2 md:py-2.5 rounded-lg text-sm font-bold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Add Category</button>
+                  </form>
                 </div>
               </div>
             )}
@@ -477,9 +519,21 @@ export default function App() {
                 </div>
                 
                 <form onSubmit={handleInspectionSubmit} className="space-y-6">
-                  {params.map(p => (
+                  {params.map((p, idx) => (
                     <div key={p.id} className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
-                      <label className="font-bold text-slate-800 block mb-3 text-base md:text-lg">{p.name}</label>
+                      <label className="font-bold text-slate-800 block mb-2 text-base md:text-lg">{idx + 1}. {p.name}</label>
+                      
+                      {/* Sub-parameters now display as a checklist guide for the inspector */}
+                      {p.subParams.length > 0 && (
+                        <ul className="mb-4 space-y-1">
+                          {p.subParams.map(sp => (
+                            <li key={sp.id} className="text-sm text-slate-600 flex items-start gap-2">
+                               <span className="text-orange-500 mt-0.5 font-black">•</span> {sp.text}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
                       <div className="flex flex-col sm:flex-row gap-3 md:gap-4 items-start sm:items-center">
                         <select name={`status-${p.id}`} className="w-full sm:w-auto p-2 md:p-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="" required>
                            <option value="" disabled>Select Status...</option>
@@ -520,3 +574,15 @@ export default function App() {
     </div>
   );
 }
+```
+
+### Step 2: Push the final features to the Cloud
+Run your standard three commands in your terminal to save these changes and let Vercel update the live site:
+
+```bash
+git add .
+git commit -m "Added add/edit/delete for parameters and updated inspection UI"
+git push
+```
+
+Now your Admin settings are **100% dynamic**. You can build an entire audit checklist from scratch, fix spelling mistakes on the fly, and it all pushes straight to Firebase (and directly into the Inspector's view)!
