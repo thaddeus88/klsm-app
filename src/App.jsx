@@ -576,13 +576,3 @@ export default function App() {
 }
 ```
 
-### Step 2: Push the final features to the Cloud
-Run your standard three commands in your terminal to save these changes and let Vercel update the live site:
-
-```bash
-git add .
-git commit -m "Added add/edit/delete for parameters and updated inspection UI"
-git push
-```
-
-Now your Admin settings are **100% dynamic**. You can build an entire audit checklist from scratch, fix spelling mistakes on the fly, and it all pushes straight to Firebase (and directly into the Inspector's view)!
