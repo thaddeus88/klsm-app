@@ -319,7 +319,7 @@ export default function App() {
         <div className="min-h-screen bg-slate-900 flex items-center justify-center w-full">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600">
             <ShieldAlert className="mx-auto text-orange-600 mb-4" size={48} />
-            <h1 className="text-2xl font-black mb-2 text-slate-900 tracking-tight">KLSM Inspection Hub</h1>
+            <h1 className="text-2xl font-black mb-2 text-slate-900 tracking-tight">KLSM HSE Hub</h1>
             <p className="text-sm text-slate-500 mb-6 font-medium">Authorized Personnel Only</p>
             
             {loginError && <div className="mb-4 p-2 bg-red-50 text-red-600 text-sm rounded-lg font-semibold border border-red-200">{loginError}</div>}
