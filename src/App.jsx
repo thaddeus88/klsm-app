@@ -38,6 +38,7 @@ const Eye = (p) => <IconWrapper {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 
 const ArrowLeft = (p) => <IconWrapper {...p}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></IconWrapper>;
 const Pencil = (p) => <IconWrapper {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconWrapper>;
 const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
+const Check = (p) => <IconWrapper {...p}><polyline points="20 6 9 17 4 12"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -68,6 +69,43 @@ const initialParameters = [
   { id: 8, name: "Environment", subParams: [] }
 ];
 
+// Compresses image to avoid exceeding Firebase's 1MB document limit
+const compressImage = (file) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 600;
+        const MAX_HEIGHT = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        // Compress to 50% quality JPEG
+        resolve(canvas.toDataURL('image/jpeg', 0.5));
+      };
+    };
+  });
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('login');
@@ -84,6 +122,7 @@ export default function App() {
   const [editingItem, setEditingItem] = useState({ id: null, subId: null, text: '' });
   const [editingOffDaysId, setEditingOffDaysId] = useState(null);
   const [tempOffDays, setTempOffDays] = useState([]);
+  const [photoPreview, setPhotoPreview] = useState({});
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -254,7 +293,17 @@ export default function App() {
     e.preventDefault();
     const formData = new FormData(e.target);
     const results = {};
+    const photos = {};
     
+    // First, compress and read any attached photos
+    for (let [key, value] of formData.entries()) {
+      if (key.startsWith('photo-') && value.size > 0) {
+        const questionName = key.replace('photo-', '');
+        photos[questionName] = await compressImage(value);
+      }
+    }
+
+    // Capture the checklist responses
     for (let [key, value] of formData.entries()) {
       if (key.startsWith('res-')) {
         const questionName = key.replace('res-', '');
@@ -267,12 +316,14 @@ export default function App() {
       inspectorName: currentUser.name,
       date: new Date().toISOString(),
       remarks: formData.get('remarks') || "None",
-      results: results
+      results: results,
+      photos: photos
     };
 
     try {
       await addDoc(collection(db, "inspections"), inspectionData);
       showToast('✅ Inspection Submitted Successfully!');
+      setPhotoPreview({}); // Clear photos
       setActiveTab('dashboard');
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -374,7 +425,7 @@ export default function App() {
         </div>
       )}
 
-      {}
+      {/* LOGIN SCREEN */}
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center w-full relative p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600 relative z-10">
@@ -405,7 +456,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {}
+          {/* SIDEBAR */}
           <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
@@ -443,10 +494,11 @@ export default function App() {
             </button>
           </aside>
 
-          {}
+          {/* MAIN CONTENT AREA */}
           <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
             <div className="flex-1 p-4 md:p-8 print:p-0">
               
+              {/* DASHBOARD TAB */}
               {activeTab === 'dashboard' && (
                 <div className="max-w-7xl mx-auto">
                   <h2 className="text-xl md:text-2xl font-black mb-6 text-slate-900">Your Assigned Zones</h2>
@@ -467,7 +519,7 @@ export default function App() {
                 </div>
               )}
 
-              {}
+              {/* ACCIDENT REPORT TAB */}
               {activeTab === 'accident-report' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto border-t-4 border-t-red-600">
                   <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6">
@@ -512,7 +564,7 @@ export default function App() {
                 </div>
               )}
 
-              {}
+              {/* ANALYTICS TAB */}
               {activeTab === 'admin-analytics' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
@@ -561,7 +613,7 @@ export default function App() {
                     </div>
                   </div>
                   
-                  {}
+                  {/* ACCIDENTS TABLE */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-red-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600 print:text-black"/> Accident & Incident Records</h3>
@@ -590,7 +642,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {}
+                  {/* PERSONNEL DAILY PROGRESS */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -635,7 +687,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {}
+                  {/* ZONE COMPLIANCE PERFORMANCE */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600 print:text-black"/> Zone Compliance Performance</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -690,7 +742,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {}
+                  {/* ALL HISTORICAL RECORDS */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
                     <h3 className="font-bold text-base md:text-lg mb-2 text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Inspection Records</h3>
                     <p className="text-xs text-slate-500 mb-4 font-medium">Access all previously submitted inspection forms here.</p>
@@ -718,7 +770,7 @@ export default function App() {
                 </div>
               )}
 
-              {}
+              {/* INDIVIDUAL REPORT VIEW */}
               {activeTab === 'view-report' && selectedReport && (
                 <div className="max-w-4xl mx-auto bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
                   <div className="flex flex-col sm:flex-row justify-between items-start border-b border-slate-200 pb-6 mb-6 print:border-b-2 print:border-black">
@@ -744,10 +796,22 @@ export default function App() {
                           let resColor = "text-slate-600";
                           if (result === "Memuaskan") resColor = "text-emerald-600";
                           if (result === "Tidak Memuaskan") resColor = "text-red-600";
+                          
+                          // Look for photo data tied to this checklist item
+                          const photoData = selectedReport.photos && selectedReport.photos[item];
+
                           return (
                             <tr key={idx} className="print:break-inside-avoid">
-                              <td className="p-3 md:p-4 text-slate-800 font-medium print:text-black">{item}</td>
-                              <td className={`p-3 md:p-4 font-bold ${resColor} print:text-black`}>{result}</td>
+                              <td className="p-3 md:p-4 text-slate-800 font-medium print:text-black">
+                                {item}
+                                {/* If a photo exists for this item, display it! */}
+                                {photoData && (
+                                  <div className="mt-3 mb-1">
+                                    <img src={photoData} alt="Inspection Attachment" className="max-w-[200px] h-auto rounded-lg border border-slate-300 shadow-sm print:max-w-[150px] print:border-black" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className={`p-3 md:p-4 font-bold ${resColor} print:text-black align-top`}>{result}</td>
                             </tr>
                           );
                         })}
@@ -761,7 +825,7 @@ export default function App() {
                 </div>
               )}
 
-              {}
+              {/* SETTINGS TAB */}
               {activeTab === 'admin-settings' && currentUser?.role === 'Level 1 Admin' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <h2 className="text-xl md:text-2xl font-black text-slate-900">System Settings</h2>
@@ -881,7 +945,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {}
+                  {/* PARAMETERS MANAGEMENT */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <h3 className="font-bold text-base md:text-lg mb-2 flex items-center gap-2 text-slate-800"><ClipboardList className="text-orange-600"/> Parameter Management</h3>
                     <p className="text-sm text-slate-500 mb-6">These parameters build the dynamic inspection form.</p>
@@ -957,7 +1021,7 @@ export default function App() {
                 </div>
               )}
 
-              {}
+              {/* INSPECTION FORM TAB */}
               {activeTab === 'inspection-form' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
                   <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6 flex justify-between items-start print:hidden">
@@ -979,25 +1043,43 @@ export default function App() {
                           {p.subParams.length === 0 ? (
                              <p className="text-sm text-slate-400 italic print:text-black">No specific checklist items defined for this category.</p>
                           ) : (
-                            p.subParams.map(sp => (
-                              <div key={sp.id} className="p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 md:gap-6 justify-between items-start sm:items-center print:border-black print:bg-white print:break-inside-avoid">
-                                 <label className="font-medium text-slate-700 text-sm flex-1 print:text-black">{sp.text}</label>
-                                 
-                                 <div className="flex w-full sm:w-auto gap-2 items-center print:hidden">
-                                   <select name={`res-[${p.name}] ${sp.text}`} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="" required>
-                                      <option value="" disabled>Pilih Status...</option>
-                                      <option value="Memuaskan">🟢 Memuaskan</option>
-                                      <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
-                                      <option value="N/A">⚪ N/A</option>
-                                   </select>
+                            p.subParams.map(sp => {
+                              const itemKey = `[${p.name}] ${sp.text}`;
+                              return (
+                                <div key={sp.id} className="p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 md:gap-6 justify-between items-start sm:items-center print:border-black print:bg-white print:break-inside-avoid">
+                                   <label className="font-medium text-slate-700 text-sm flex-1 print:text-black">{sp.text}</label>
                                    
-                                   <label className="flex items-center justify-center p-2 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 hover:text-orange-600 transition-colors cursor-pointer" title="Attach Photo">
-                                      <Camera size={20}/>
-                                      <input type="file" accept="image/*" capture="environment" className="hidden" />
-                                   </label>
-                                 </div>
-                              </div>
-                            ))
+                                   <div className="flex w-full sm:w-auto gap-2 items-center print:hidden">
+                                     <select name={`res-${itemKey}`} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="" required>
+                                        <option value="" disabled>Pilih Status...</option>
+                                        <option value="Memuaskan">🟢 Memuaskan</option>
+                                        <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
+                                        <option value="N/A">⚪ N/A</option>
+                                     </select>
+                                     
+                                     {/* PHOTO UPLOAD BUTTON */}
+                                     <label 
+                                        className={`flex items-center justify-center p-2 border rounded-lg transition-colors cursor-pointer ${photoPreview[itemKey] ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-orange-600'}`} 
+                                        title={photoPreview[itemKey] ? "Photo Attached!" : "Attach Photo"}
+                                     >
+                                        {photoPreview[itemKey] ? <Check size={20}/> : <Camera size={20}/>}
+                                        <input 
+                                          type="file" 
+                                          name={`photo-${itemKey}`}
+                                          accept="image/*" 
+                                          capture="environment" 
+                                          className="hidden" 
+                                          onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                              setPhotoPreview(prev => ({...prev, [itemKey]: true}));
+                                            }
+                                          }}
+                                        />
+                                     </label>
+                                   </div>
+                                </div>
+                              );
+                            })
                           )}
                         </div>
                       </div>
@@ -1015,7 +1097,7 @@ export default function App() {
                     </div>
 
                     <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4 print:hidden">
-                       <button type="button" onClick={() => setActiveTab('dashboard')} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
+                       <button type="button" onClick={() => { setActiveTab('dashboard'); setPhotoPreview({}); }} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
                        <button type="submit" className="w-full sm:w-2/3 bg-orange-600 text-white py-3 rounded-xl font-black text-base md:text-lg hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-all">Submit Final Inspection</button>
                     </div>
                   </form>
@@ -1023,7 +1105,7 @@ export default function App() {
               )}
             </div>
 
-            {}
+            {/* FOOTER */}
             <div className="mt-auto py-6 text-center text-xs text-slate-400 font-medium print:hidden border-t border-slate-200 bg-slate-50 w-full">
                &copy; 2026 KLSMHSE <br className="md:hidden" /><span className="hidden md:inline mx-2">•</span> Developed by ThadYap
             </div>
