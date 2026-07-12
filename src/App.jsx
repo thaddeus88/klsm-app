@@ -61,6 +61,7 @@ export default function App() {
   const [personnel, setPersonnel] = useState(initialUsers);
   const [selectedZone, setSelectedZone] = useState(null);
   const [loginError, setLoginError] = useState('');
+  const [inspections, setInspections] = useState([]);
 
   // Fetch from Firebase automatically
   useEffect(() => {
@@ -74,7 +75,12 @@ export default function App() {
       else setDoc(doc(db, "settings", "personnel"), { personnelList: initialUsers });
     });
 
-    return () => { unsubParams(); unsubPersonnel(); };
+    const unsubInspections = onSnapshot(collection(db, "inspections"), (snapshot) => {
+      const inspData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setInspections(inspData);
+    });
+
+    return () => { unsubParams(); unsubPersonnel(); unsubInspections(); };
   }, []);
 
   const handleLogin = (e) => {
@@ -92,6 +98,15 @@ export default function App() {
     }
   };
 
+  const isToday = (dateString) => {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
   // --- EXPORT FUNCTIONS ---
   const exportAnalyticsExcel = () => {
     let rows = [
@@ -101,11 +116,24 @@ export default function App() {
       ["Zone", "Last Inspected", "Issues Found", "Compliance Rate", "Status"]
     ];
     
-    initialZones.forEach((zone, idx) => {
-      const compliance = 100 - (idx * 5);
-      const issues = idx > 5 ? (idx * 2) - 5 : 0;
-      const status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
-      rows.push([`"${zone}"`, "Today 10:00 AM", issues, `${compliance}%`, status]);
+    initialZones.forEach((zone) => {
+      const zoneInspections = inspections.filter(i => i.zone === zone).sort((a, b) => new Date(b.date) - new Date(a.date));
+      const latest = zoneInspections[0];
+      let compliance = 0, issues = 0, status = "N/A", lastInspected = "Never";
+      
+      if (latest) {
+        lastInspected = new Date(latest.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+        let memuaskan = 0, tidak = 0;
+        Object.values(latest.results || {}).forEach(v => {
+          if (v === "Memuaskan") memuaskan++;
+          if (v === "Tidak Memuaskan") tidak++;
+        });
+        issues = tidak;
+        const total = memuaskan + tidak;
+        compliance = total > 0 ? Math.round((memuaskan / total) * 100) : 0;
+        status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
+      }
+      rows.push([`"${zone}"`, `"${lastInspected}"`, issues, `${compliance}%`, status]);
     });
     
     rows.push([]);
@@ -113,7 +141,13 @@ export default function App() {
     rows.push(["Inspector", "Assigned Zones", "Target Freq.", "Today's Progress", "Status"]);
     
     personnel.filter(p => p.role === 'Inspector').forEach(p => {
-      rows.push([`"${p.name}"`, `"${p.zones.join(', ')}"`, `"${p.freq}"`, "1/2", "In Progress"]);
+      const todaysInspections = inspections.filter(i => i.inspectorName === p.name && isToday(i.date));
+      const progressCount = todaysInspections.length;
+      const targetMatch = p.freq.match(/(\d+)/);
+      const targetNum = targetMatch ? parseInt(targetMatch[1]) : 1;
+      const status = progressCount >= targetNum ? "Completed" : (progressCount > 0 ? "In Progress" : "Pending");
+      
+      rows.push([`"${p.name}"`, `"${p.zones.join(', ')}"`, `"${p.freq}"`, `"${progressCount}/${targetNum}"`, status]);
     });
 
     const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
@@ -407,24 +441,42 @@ export default function App() {
                         <tr><th className="p-3 md:p-4 rounded-tl-xl">Inspector</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Today's Progress</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 print:divide-slate-300">
-                        {personnel.filter(p => p.role === 'Inspector').map(p => (
-                          <tr key={p.id} className="hover:bg-slate-50/50">
-                            <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
-                            <td className="p-3 md:p-4 text-slate-600">
-                              <div className="flex flex-wrap gap-1">
-                                {p.zones.map(z => <span key={z} className="bg-slate-100 px-2 py-1 rounded text-xs print:bg-white print:border print:border-slate-300">{z.split('–')[0]}</span>)}
-                              </div>
-                            </td>
-                            <td className="p-3 md:p-4 font-medium">{p.freq}</td>
-                            <td className="p-3 md:p-4">
-                              <div className="flex items-center gap-2">
-                                <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden"><div className="bg-orange-500 h-2.5 rounded-full" style={{width: '50%'}}></div></div>
-                                <span className="text-xs font-bold text-slate-500 print:text-black">1/2</span>
-                              </div>
-                            </td>
-                            <td className="p-3 md:p-4"><span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg print:border print:border-black print:bg-white print:text-black">In Progress</span></td>
-                          </tr>
-                        ))}
+                        {personnel.filter(p => p.role === 'Inspector').map(p => {
+                          const todaysInspections = inspections.filter(i => i.inspectorName === p.name && isToday(i.date));
+                          const progressCount = todaysInspections.length;
+                          // Extract target number from string (e.g., "2 times/day" -> 2), default to 1 if unreadable
+                          const targetMatch = p.freq.match(/(\d+)/);
+                          const targetNum = targetMatch ? parseInt(targetMatch[1]) : 1;
+                          const progressPercent = Math.min((progressCount / targetNum) * 100, 100);
+                          
+                          const pStatus = progressCount >= targetNum ? "Completed" : (progressCount > 0 ? "In Progress" : "Pending");
+                          const pStatusColors = {
+                            'Completed': 'bg-emerald-100 text-emerald-700 print:border print:border-black print:bg-white print:text-black',
+                            'In Progress': 'bg-amber-100 text-amber-700 print:border print:border-black print:bg-white print:text-black',
+                            'Pending': 'bg-slate-100 text-slate-700 print:border print:border-black print:bg-white print:text-black'
+                          };
+
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50/50">
+                              <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
+                              <td className="p-3 md:p-4 text-slate-600">
+                                <div className="flex flex-wrap gap-1">
+                                  {p.zones.map(z => <span key={z} className="bg-slate-100 px-2 py-1 rounded text-xs print:bg-white print:border print:border-slate-300">{z.split('–')[0]}</span>)}
+                                </div>
+                              </td>
+                              <td className="p-3 md:p-4 font-medium">{p.freq}</td>
+                              <td className="p-3 md:p-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
+                                    <div className={`h-2.5 rounded-full ${pStatus === 'Completed' ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{width: `${progressPercent}%`}}></div>
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-500 print:text-black">{progressCount}/{targetNum}</span>
+                                </div>
+                              </td>
+                              <td className="p-3 md:p-4"><span className={`px-2 py-1 text-xs font-bold rounded-lg ${pStatusColors[pStatus]}`}>{pStatus}</span></td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -439,26 +491,48 @@ export default function App() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 print:divide-slate-300">
                         {initialZones.map((zone, idx) => {
-                          const compliance = 100 - (idx * 5);
-                          const issues = idx > 5 ? (idx * 2) - 5 : 0; 
-                          const status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
+                          // Find latest inspection for this zone
+                          const zoneInspections = inspections.filter(i => i.zone === zone).sort((a, b) => new Date(b.date) - new Date(a.date));
+                          const latest = zoneInspections[0];
+                          
+                          let compliance = 0;
+                          let issues = 0; 
+                          let status = "N/A";
+                          let lastInspected = "Never";
+
+                          if (latest) {
+                            lastInspected = new Date(latest.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+                            let memuaskan = 0;
+                            let tidak = 0;
+                            // Tally sub-parameters for most recent inspection
+                            Object.values(latest.results || {}).forEach(val => {
+                              if (val === "Memuaskan") memuaskan++;
+                              if (val === "Tidak Memuaskan") tidak++;
+                            });
+                            issues = tidak;
+                            const total = memuaskan + tidak;
+                            compliance = total > 0 ? Math.round((memuaskan / total) * 100) : 0;
+                            status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
+                          }
+
                           const statusColors = {
                              'Good': 'bg-emerald-100 text-emerald-700 print:border print:border-black print:bg-white print:text-black',
                              'Warning': 'bg-amber-100 text-amber-700 print:border print:border-black print:bg-white print:text-black',
-                             'Critical': 'bg-red-100 text-red-700 print:border print:border-black print:bg-white print:text-black'
+                             'Critical': 'bg-red-100 text-red-700 print:border print:border-black print:bg-white print:text-black',
+                             'N/A': 'bg-slate-100 text-slate-700 print:border print:border-black print:bg-white print:text-black'
                           };
                           
                           return (
                             <tr key={idx} className="hover:bg-slate-50/50">
                               <td className="p-3 md:p-4 font-bold text-slate-800 max-w-[200px] truncate print:whitespace-normal" title={zone}>{zone}</td>
-                              <td className="p-3 md:p-4 text-slate-600 print:text-black">Today, 10:00 AM</td>
+                              <td className="p-3 md:p-4 text-slate-600 print:text-black">{lastInspected}</td>
                               <td className="p-3 md:p-4 font-medium">{issues > 0 ? <span className="text-red-600 print:text-black">{issues}</span> : <span className="text-slate-400 print:text-black">0</span>}</td>
                               <td className="p-3 md:p-4">
                                 <div className="flex items-center gap-2">
                                   <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
-                                    <div className={`h-2.5 rounded-full ${compliance >= 90 ? 'bg-emerald-500' : (compliance >= 70 ? 'bg-amber-500' : 'bg-red-500')}`} style={{width: `${compliance}%`}}></div>
+                                    <div className={`h-2.5 rounded-full ${compliance >= 90 ? 'bg-emerald-500' : (compliance >= 70 ? 'bg-amber-500' : (status === 'N/A' ? 'bg-transparent' : 'bg-red-500'))}`} style={{width: `${status === 'N/A' ? 0 : compliance}%`}}></div>
                                   </div>
-                                  <span className="text-xs font-bold text-slate-500 print:text-black">{compliance}%</span>
+                                  <span className="text-xs font-bold text-slate-500 print:text-black">{status === 'N/A' ? '-' : `${compliance}%`}</span>
                                 </div>
                               </td>
                               <td className="p-3 md:p-4"><span className={`px-2 py-1 text-xs font-bold rounded-lg ${statusColors[status]}`}>{status}</span></td>
