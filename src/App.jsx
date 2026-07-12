@@ -1,6 +1,20 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { db } from './firebase'; 
-import { collection, addDoc, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, doc, setDoc, onSnapshot } from "firebase/firestore";
+
+// Firebase Configuration embedded directly for single-file compilation
+const firebaseConfig = {
+  apiKey: "AIzaSyCg7JF2MVE76XmTe78YohYL528-myxmUcw",
+  authDomain: "klsm-workplace-inspection-hub.firebaseapp.com",
+  projectId: "klsm-workplace-inspection-hub",
+  storageBucket: "klsm-workplace-inspection-hub.firebasestorage.app",
+  messagingSenderId: "240176737595",
+  appId: "1:240176737595:web:f8f03a7b2f94a6fe5f9b1e",
+  measurementId: "G-HXXK9GH568"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const IconWrapper = ({ children, size = 24, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
@@ -67,10 +81,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [toastMsg, setToastMsg] = useState(null);
   
-  // State for editing parameters
   const [editingItem, setEditingItem] = useState({ id: null, subId: null, text: '' });
-  
-  // State for editing off-days
   const [editingOffDaysId, setEditingOffDaysId] = useState(null);
   const [tempOffDays, setTempOffDays] = useState([]);
 
@@ -165,7 +176,6 @@ export default function App() {
     }
   };
 
-  // Function to instantly save edited Off Days
   const saveOffDays = async (userId) => {
     const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, offDays: tempOffDays } : p);
     setPersonnel(updatedPersonnel);
@@ -327,18 +337,44 @@ export default function App() {
 
   const displayedZones = currentUser?.role.includes('Admin') ? initialZones : initialZones.filter(z => currentUser?.zones.includes(z));
 
+  const currentYear = new Date().getFullYear();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  const monthlyCounts = new Array(12).fill(0);
+  const monthlyCompData = Array.from({length: 12}, () => ({ sum: 0, count: 0 }));
+
+  inspections.forEach(insp => {
+    const d = new Date(insp.date);
+    if(d.getFullYear() === currentYear) {
+      const month = d.getMonth();
+      monthlyCounts[month]++;
+
+      let memuaskan = 0; let totalScored = 0;
+      Object.values(insp.results || {}).forEach(val => {
+        if (val === "Memuaskan") { memuaskan++; totalScored++; }
+        if (val === "Tidak Memuaskan") { totalScored++; }
+      });
+      if(totalScored > 0) {
+        const comp = (memuaskan / totalScored) * 100;
+        monthlyCompData[month].sum += comp;
+        monthlyCompData[month].count++;
+      }
+    }
+  });
+
+  const maxCount = Math.max(...monthlyCounts, 1);
+  const monthlyComp = monthlyCompData.map(d => d.count > 0 ? Math.round(d.sum / d.count) : 0);
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
       
-      {}
-      {/* Toast Notification System */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 bg-slate-900 text-white font-bold px-6 py-4 rounded-xl shadow-2xl z-50 animate-bounce print:hidden border border-slate-700 flex items-center gap-2">
           {toastMsg}
         </div>
       )}
 
-      {/* Login Screen */}
+      {}
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center w-full relative p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600 relative z-10">
@@ -369,7 +405,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* Sidebar Navigation */}
+          {}
           <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
@@ -407,11 +443,10 @@ export default function App() {
             </button>
           </aside>
 
-          {/* Main Content Area */}
+          {}
           <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
             <div className="flex-1 p-4 md:p-8 print:p-0">
               
-              {/* Dashboard Tab */}
               {activeTab === 'dashboard' && (
                 <div className="max-w-7xl mx-auto">
                   <h2 className="text-xl md:text-2xl font-black mb-6 text-slate-900">Your Assigned Zones</h2>
@@ -432,7 +467,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Accident Reporting Form */}
+              {}
               {activeTab === 'accident-report' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto border-t-4 border-t-red-600">
                   <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6">
@@ -477,7 +512,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Admin Analytics Panel */}
+              {}
               {activeTab === 'admin-analytics' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
@@ -491,7 +526,42 @@ export default function App() {
                        </button>
                      </div>
                   </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 print:hidden">
+                    <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Monthly Inspections ({currentYear})</h3>
+                       <p className="text-xs text-slate-500 mb-6">Total number of inspections submitted by all personnel.</p>
+                       <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200">
+                         {monthlyCounts.map((count, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group">
+                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">{count}</span>
+                               <div className="w-full bg-orange-500 rounded-t-md transition-all duration-300 group-hover:bg-orange-600" style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0px' }}></div>
+                            </div>
+                         ))}
+                       </div>
+                       <div className="flex gap-1 md:gap-3 mt-2">
+                         {months.map(m => <div key={m} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold">{m}</div>)}
+                       </div>
+                    </div>
+
+                    <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><Activity className="text-orange-600"/> Average Zone Compliance ({currentYear})</h3>
+                       <p className="text-xs text-slate-500 mb-6">Average percentage score across all inspected zones.</p>
+                       <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200">
+                         {monthlyComp.map((avg, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
+                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{avg}%</span>
+                               <div className={`w-full rounded-t-md transition-all duration-300 ${avg >= 90 ? 'bg-emerald-500 group-hover:bg-emerald-600' : (avg >= 70 ? 'bg-amber-500 group-hover:bg-amber-600' : 'bg-red-500 group-hover:bg-red-600')}`} style={{ height: `${avg}%`, minHeight: avg > 0 ? '4px' : '0px' }}></div>
+                            </div>
+                         ))}
+                       </div>
+                       <div className="flex gap-1 md:gap-3 mt-2">
+                         {months.map(m => <div key={m} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold">{m}</div>)}
+                       </div>
+                    </div>
+                  </div>
                   
+                  {}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-red-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600 print:text-black"/> Accident & Incident Records</h3>
@@ -520,6 +590,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  {}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -564,6 +635,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  {}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600 print:text-black"/> Zone Compliance Performance</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -618,6 +690,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  {}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
                     <h3 className="font-bold text-base md:text-lg mb-2 text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Inspection Records</h3>
                     <p className="text-xs text-slate-500 mb-4 font-medium">Access all previously submitted inspection forms here.</p>
@@ -645,7 +718,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Render Saved Single Report View */}
+              {}
               {activeTab === 'view-report' && selectedReport && (
                 <div className="max-w-4xl mx-auto bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
                   <div className="flex flex-col sm:flex-row justify-between items-start border-b border-slate-200 pb-6 mb-6 print:border-b-2 print:border-black">
@@ -688,7 +761,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Settings Tab */}
+              {}
               {activeTab === 'admin-settings' && currentUser?.role === 'Level 1 Admin' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <h2 className="text-xl md:text-2xl font-black text-slate-900">System Settings</h2>
@@ -763,7 +836,6 @@ export default function App() {
                             <td className="p-3 md:p-4 text-xs text-slate-600 max-w-[200px] truncate">{p.zones.join(', ')}</td>
                             <td className="p-3 md:p-4 font-medium">{p.freq}</td>
                             
-                            {/* Editable Off Days Cell */}
                             <td className="p-3 md:p-4 text-xs text-slate-600 font-medium">
                               {editingOffDaysId === p.id ? (
                                  <div className="flex flex-col gap-2 min-w-[200px]">
@@ -809,6 +881,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  {}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <h3 className="font-bold text-base md:text-lg mb-2 flex items-center gap-2 text-slate-800"><ClipboardList className="text-orange-600"/> Parameter Management</h3>
                     <p className="text-sm text-slate-500 mb-6">These parameters build the dynamic inspection form.</p>
@@ -884,7 +957,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Inspection Form */}
+              {}
               {activeTab === 'inspection-form' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
                   <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6 flex justify-between items-start print:hidden">
@@ -950,7 +1023,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Global Dashboard Footer */}
+            {}
             <div className="mt-auto py-6 text-center text-xs text-slate-400 font-medium print:hidden border-t border-slate-200 bg-slate-50 w-full">
                &copy; 2026 KLSMHSE <br className="md:hidden" /><span className="hidden md:inline mx-2">•</span> Developed by ThadYap
             </div>
