@@ -22,6 +22,7 @@ const FileText = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a
 const FileSpreadsheet = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></IconWrapper>;
 const Eye = (p) => <IconWrapper {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></IconWrapper>;
 const ArrowLeft = (p) => <IconWrapper {...p}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></IconWrapper>;
+const Pencil = (p) => <IconWrapper {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -63,15 +64,14 @@ export default function App() {
   const [selectedReport, setSelectedReport] = useState(null);
   const [loginError, setLoginError] = useState('');
   const [toastMsg, setToastMsg] = useState(null);
+  const [editingItem, setEditingItem] = useState({ id: null, subId: null, text: '' });
 
-  // Helper function for safe notifications
   const showToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
   };
 
   useEffect(() => {
-    // Listen for Parameters
     const unsubParams = onSnapshot(doc(db, "settings", "parameters"), (docSnap) => {
       if (docSnap.exists()) {
         setParams(docSnap.data().paramsList);
@@ -80,7 +80,6 @@ export default function App() {
       }
     });
 
-    // Listen for Personnel
     const unsubPersonnel = onSnapshot(doc(db, "settings", "personnel"), (docSnap) => {
       if (docSnap.exists()) {
         setPersonnel(docSnap.data().personnelList);
@@ -89,7 +88,6 @@ export default function App() {
       }
     });
 
-    // Listen for ALL past Inspections (for History and Live Analytics)
     const unsubInspections = onSnapshot(collection(db, "inspections"), (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setInspections(data);
@@ -182,12 +180,42 @@ export default function App() {
     await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
   };
 
+  // The inline editing function that saves changes straight to Firebase
+  const saveEdit = async () => {
+    if (!editingItem.text.trim()) {
+      setEditingItem({ id: null, subId: null, text: '' });
+      return;
+    }
+
+    let updatedParams;
+    if (editingItem.subId === null) {
+      // Editing a Main Parameter
+      updatedParams = params.map(p => p.id === editingItem.id ? { ...p, name: editingItem.text } : p);
+    } else {
+      // Editing a Sub Parameter
+      updatedParams = params.map(p => {
+        if (p.id === editingItem.id) {
+          return {
+            ...p,
+            subParams: p.subParams.map(sp => sp.id === editingItem.subId ? { ...sp, text: editingItem.text } : sp)
+          };
+        }
+        return p;
+      });
+    }
+
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    setEditingItem({ id: null, subId: null, text: '' });
+    showToast("Parameter updated successfully.");
+  };
+
   const handleInspectionSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const results = {};
     
-    // Extract dynamic answers for each sub-parameter
+    // Extract dynamic answers for each sub-parameter in the form
     for (let [key, value] of formData.entries()) {
       if (key.startsWith('res-')) {
         const questionName = key.replace('res-', '');
@@ -241,6 +269,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Login Screen */}
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center w-full">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600">
@@ -267,7 +296,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {}
+          {/* Sidebar Navigation */}
           <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
@@ -301,7 +330,7 @@ export default function App() {
             </button>
           </aside>
 
-          {}
+          {/* Main Dashboard / Inspector View */}
           <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
             {activeTab === 'dashboard' && (
               <div className="max-w-7xl mx-auto">
@@ -323,7 +352,7 @@ export default function App() {
               </div>
             )}
 
-            {}
+            {/* Admin Analytics Panel */}
             {activeTab === 'admin-analytics' && (
               <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                 <div className="flex justify-between items-center print:hidden">
@@ -338,7 +367,6 @@ export default function App() {
                    </div>
                 </div>
                 
-                {/* Personnel Live Progress */}
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                   <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
                   <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -376,7 +404,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Zone Live Performance */}
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                   <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600 print:text-black"/> Zone Compliance Performance</h3>
                   <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -431,7 +458,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Historical Records Database */}
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
                   <h3 className="font-bold text-base md:text-lg mb-2 text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Records</h3>
                   <p className="text-xs text-slate-500 mb-4 font-medium">Access all previously submitted forms here.</p>
@@ -459,7 +485,7 @@ export default function App() {
               </div>
             )}
 
-            {}
+            {/* Render Saved Single Report View */}
             {activeTab === 'view-report' && selectedReport && (
               <div className="max-w-4xl mx-auto bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
                 <div className="flex flex-col sm:flex-row justify-between items-start border-b border-slate-200 pb-6 mb-6 print:border-b-2 print:border-black">
@@ -502,14 +528,13 @@ export default function App() {
               </div>
             )}
 
-            {}
             {activeTab === 'admin-settings' && currentUser?.role === 'Level 1 Admin' && (
               <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                 <h2 className="text-xl md:text-2xl font-black text-slate-900">System Settings</h2>
                 
-                {/* Users Setting */}
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <h3 className="font-bold text-base md:text-lg mb-6 flex items-center gap-2 text-slate-800"><Users className="text-orange-600"/> Personnel Management</h3>
+                  
                   <div className="bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-200 mb-8">
                     <h4 className="font-bold text-sm mb-4 text-slate-700 uppercase">Register New Personnel</h4>
                     <form onSubmit={addPersonnel} className="space-y-4">
@@ -521,7 +546,9 @@ export default function App() {
                         <div>
                            <label className="block text-xs font-bold text-slate-500 mb-1">Role</label>
                            <select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none">
-                             <option>Inspector</option><option>Level 1 Admin</option><option>Level 2 Admin</option>
+                             <option>Inspector</option>
+                             <option>Level 1 Admin</option>
+                             <option>Level 2 Admin</option>
                            </select>
                         </div>
                         <div>
@@ -533,6 +560,7 @@ export default function App() {
                            <input name="password" placeholder="Set password" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
                         </div>
                       </div>
+                      
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-2">Assign Zones (Ignored for Admins)</label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200 h-48 overflow-y-auto">
@@ -573,7 +601,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Parameters Setting */}
                 <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <h3 className="font-bold text-base md:text-lg mb-2 flex items-center gap-2 text-slate-800"><ClipboardList className="text-orange-600"/> Parameter Management</h3>
                   <p className="text-sm text-slate-500 mb-6">These parameters build the dynamic inspection form.</p>
@@ -582,19 +609,53 @@ export default function App() {
                     {params.map(p => (
                       <div key={p.id} className="border border-slate-200 rounded-xl overflow-hidden">
                          <div className="bg-slate-50 p-3 md:p-4 border-b border-slate-200 font-black text-slate-800 flex justify-between items-center text-sm md:text-base">
-                            <span className="flex-1">{p.name}</span>
-                            <div className="flex items-center gap-3">
-                               <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{p.subParams.length} items</span>
-                               <button onClick={() => deleteMainParam(p.id)} className="text-slate-400 hover:text-red-600" title="Delete Category"><Trash2 size={16}/></button>
-                            </div>
+                            {editingItem.id === p.id && editingItem.subId === null ? (
+                               <div className="flex-1 flex items-center gap-2 mr-4">
+                                 <input
+                                   value={editingItem.text}
+                                   onChange={(e) => setEditingItem({...editingItem, text: e.target.value})}
+                                   className="w-full border border-orange-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none font-medium"
+                                   autoFocus
+                                 />
+                                 <button onClick={saveEdit} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-emerald-700">Save</button>
+                                 <button onClick={() => setEditingItem({ id: null, subId: null, text: '' })} className="bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-400">Cancel</button>
+                               </div>
+                            ) : (
+                               <>
+                                 <span className="flex-1">{p.name}</span>
+                                 <div className="flex items-center gap-3">
+                                    <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{p.subParams.length} items</span>
+                                    <button onClick={() => setEditingItem({ id: p.id, subId: null, text: p.name })} className="text-slate-400 hover:text-orange-600" title="Edit Category"><Pencil size={16}/></button>
+                                    <button onClick={() => deleteMainParam(p.id)} className="text-slate-400 hover:text-red-600" title="Delete Category"><Trash2 size={16}/></button>
+                                 </div>
+                               </>
+                            )}
                          </div>
                          <div className="p-3 md:p-4 bg-white">
                             <ul className="space-y-2 mb-4">
                               {p.subParams.length === 0 && <li className="text-sm text-slate-400 italic">No sub-parameters added yet. Inspectors will see a blank category.</li>}
                               {p.subParams.map(sp => (
                                  <li key={sp.id} className="flex justify-between items-center bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100 text-xs md:text-sm font-medium text-slate-700">
-                                   <span className="flex-1 pr-4">{sp.text}</span>
-                                   <button onClick={() => removeSubParam(p.id, sp.id)} title="Remove Sub-Parameter" className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                   {editingItem.id === p.id && editingItem.subId === sp.id ? (
+                                      <div className="flex-1 flex items-center gap-2">
+                                        <input
+                                          value={editingItem.text}
+                                          onChange={(e) => setEditingItem({...editingItem, text: e.target.value})}
+                                          className="w-full border border-orange-300 p-1.5 rounded-md text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                                          autoFocus
+                                        />
+                                        <button onClick={saveEdit} className="bg-emerald-600 text-white px-2 py-1.5 rounded-md text-xs font-bold hover:bg-emerald-700">Save</button>
+                                        <button onClick={() => setEditingItem({ id: null, subId: null, text: '' })} className="bg-slate-300 text-slate-700 px-2 py-1.5 rounded-md text-xs font-bold hover:bg-slate-400">Cancel</button>
+                                      </div>
+                                   ) : (
+                                      <>
+                                        <span className="flex-1 pr-4">{sp.text}</span>
+                                        <div className="flex items-center gap-2">
+                                          <button onClick={() => setEditingItem({ id: p.id, subId: sp.id, text: sp.text })} title="Edit Sub-Parameter" className="text-slate-400 hover:text-orange-600 transition-colors"><Pencil size={16}/></button>
+                                          <button onClick={() => removeSubParam(p.id, sp.id)} title="Remove Sub-Parameter" className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                        </div>
+                                      </>
+                                   )}
                                  </li>
                               ))}
                             </ul>
@@ -615,7 +676,6 @@ export default function App() {
               </div>
             )}
 
-            {}
             {activeTab === 'inspection-form' && (
               <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
                 <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6 flex justify-between items-start print:hidden">
