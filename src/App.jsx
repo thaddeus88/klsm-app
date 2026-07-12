@@ -38,9 +38,9 @@ const initialZones = [
 ];
 
 const initialUsers = [
-  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234" },
-  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234" },
-  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234" }
+  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"] },
+  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [] },
+  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [] }
 ];
 
 const initialParameters = [
@@ -66,7 +66,13 @@ export default function App() {
   const [selectedReport, setSelectedReport] = useState(null);
   const [loginError, setLoginError] = useState('');
   const [toastMsg, setToastMsg] = useState(null);
+  
+  // State for editing parameters
   const [editingItem, setEditingItem] = useState({ id: null, subId: null, text: '' });
+  
+  // State for editing off-days
+  const [editingOffDaysId, setEditingOffDaysId] = useState(null);
+  const [tempOffDays, setTempOffDays] = useState([]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -121,14 +127,16 @@ export default function App() {
 
   const addPersonnel = async (e) => {
     e.preventDefault();
-    const checkedZones = Array.from(e.target.zone).filter(cb => cb.checked).map(cb => cb.value);
+    const checkedZones = Array.from(e.target.querySelectorAll('input[name="zone"]:checked')).map(cb => cb.value);
+    const checkedOffDays = Array.from(e.target.querySelectorAll('input[name="offDays"]:checked')).map(cb => cb.value);
     const newPerson = {
       id: Date.now(),
       name: e.target.name.value,
       role: e.target.role.value,
       zones: e.target.role.value.includes('Admin') ? ['All'] : checkedZones,
       freq: e.target.freq.value,
-      password: e.target.password.value
+      password: e.target.password.value,
+      offDays: checkedOffDays
     };
     
     const updatedPersonnel = [...personnel, newPerson];
@@ -149,10 +157,21 @@ export default function App() {
   };
 
   const deleteUser = async (userId) => {
-    const updatedPersonnel = personnel.filter(u => u.id !== userId);
+    if(window.confirm("Are you sure you want to delete this user?")) {
+      const updatedPersonnel = personnel.filter(u => u.id !== userId);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+      showToast("Personnel deleted.");
+    }
+  };
+
+  // Function to instantly save edited Off Days
+  const saveOffDays = async (userId) => {
+    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, offDays: tempOffDays } : p);
     setPersonnel(updatedPersonnel);
     await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
-    showToast("Personnel deleted.");
+    setEditingOffDaysId(null);
+    showToast("Off days updated successfully.");
   };
 
   const addMainParam = async (e) => {
@@ -168,10 +187,12 @@ export default function App() {
   };
 
   const deleteMainParam = async (paramId) => {
-    const updatedParams = params.filter(p => p.id !== paramId);
-    setParams(updatedParams);
-    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
-    showToast("Parameter category removed.");
+    if(window.confirm("Delete this entire category and all its items?")) {
+      const updatedParams = params.filter(p => p.id !== paramId);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+      showToast("Parameter category removed.");
+    }
   };
 
   const addSubParam = async (e, paramId) => {
@@ -185,9 +206,11 @@ export default function App() {
   };
 
   const removeSubParam = async (paramId, subParamId) => {
-    const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: p.subParams.filter(sp => sp.id !== subParamId) } : p);
-    setParams(updatedParams);
-    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    if(window.confirm("Remove this checklist item?")) {
+      const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: p.subParams.filter(sp => sp.id !== subParamId) } : p);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    }
   };
 
   const saveEdit = async () => {
@@ -307,6 +330,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
       
+      {}
       {/* Toast Notification System */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 bg-slate-900 text-white font-bold px-6 py-4 rounded-xl shadow-2xl z-50 animate-bounce print:hidden border border-slate-700 flex items-center gap-2">
@@ -339,7 +363,6 @@ export default function App() {
             </form>
           </div>
           
-          {/* Footer - Login Screen */}
           <div className="absolute bottom-6 text-center text-xs text-slate-500 font-medium">
              &copy; 2026 KLSMHSE <span className="mx-2 hidden md:inline">•</span><br className="md:hidden" /> Developed by ThadYap
           </div>
@@ -387,6 +410,8 @@ export default function App() {
           {/* Main Content Area */}
           <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
             <div className="flex-1 p-4 md:p-8 print:p-0">
+              
+              {/* Dashboard Tab */}
               {activeTab === 'dashboard' && (
                 <div className="max-w-7xl mx-auto">
                   <h2 className="text-xl md:text-2xl font-black mb-6 text-slate-900">Your Assigned Zones</h2>
@@ -467,7 +492,6 @@ export default function App() {
                      </div>
                   </div>
                   
-                  {/* Accident Records Table */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-red-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600 print:text-black"/> Accident & Incident Records</h3>
@@ -506,24 +530,31 @@ export default function App() {
                         <tbody className="divide-y divide-slate-100 print:divide-slate-300">
                           {personnel.filter(p => p.role === 'Inspector').map(p => {
                             const target = parseInt(p.freq) || 0;
+                            const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                            const isOffDay = p.offDays && p.offDays.includes(todayName);
+                            const actualTarget = isOffDay ? 0 : target;
                             const today = new Date().toLocaleDateString();
                             const completedToday = inspections.filter(i => i.inspectorName === p.name && new Date(i.date).toLocaleDateString() === today).length;
-                            const percentage = target > 0 ? Math.min((completedToday / target) * 100, 100) : 100;
+                            const percentage = actualTarget > 0 ? Math.min((completedToday / actualTarget) * 100, 100) : 100;
 
                             return (
                               <tr key={p.id} className="hover:bg-slate-50/50">
                                 <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
-                                <td className="p-3 md:p-4 font-medium">{p.freq} times</td>
+                                <td className="p-3 md:p-4 font-medium">{isOffDay ? <span className="text-slate-400 italic">Off Day</span> : `${p.freq} times`}</td>
                                 <td className="p-3 md:p-4">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
-                                      <div className="bg-orange-500 h-2.5 rounded-full" style={{width: `${percentage}%`}}></div>
+                                  {isOffDay ? (
+                                    <span className="text-slate-400 italic text-sm font-medium">No inspection required</span>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
+                                        <div className="bg-orange-500 h-2.5 rounded-full" style={{width: `${percentage}%`}}></div>
+                                      </div>
+                                      <span className="text-xs font-bold text-slate-500 print:text-black">{completedToday}/{target}</span>
                                     </div>
-                                    <span className="text-xs font-bold text-slate-500 print:text-black">{completedToday}/{target}</span>
-                                  </div>
+                                  )}
                                 </td>
                                 <td className="p-3 md:p-4">
-                                  {percentage >= 100 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg print:border print:border-black">Complete</span> : <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg print:border print:border-black">In Progress</span>}
+                                  {isOffDay ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg print:border print:border-black">Off Day</span> : (percentage >= 100 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg print:border print:border-black">Complete</span> : <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg print:border print:border-black">In Progress</span>)}
                                 </td>
                               </tr>
                             );
@@ -657,6 +688,7 @@ export default function App() {
                 </div>
               )}
 
+              {/* Settings Tab */}
               {activeTab === 'admin-settings' && currentUser?.role === 'Level 1 Admin' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <h2 className="text-xl md:text-2xl font-black text-slate-900">System Settings</h2>
@@ -701,6 +733,19 @@ export default function App() {
                              ))}
                           </div>
                         </div>
+                        
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-2">Select Off Days</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200">
+                             {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, idx) => (
+                               <label key={idx} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                 <input type="checkbox" name="offDays" value={day} className="text-orange-600 focus:ring-orange-500 rounded" />
+                                 <span className="leading-tight">{day}</span>
+                               </label>
+                             ))}
+                          </div>
+                        </div>
+                        
                         <button type="submit" className="w-full md:w-auto bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex justify-center items-center gap-2"><UserPlus size={16}/> Add Personnel</button>
                       </form>
                     </div>
@@ -708,7 +753,7 @@ export default function App() {
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                       <table className="w-full text-sm text-left min-w-[600px]">
                         <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
-                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Name</th><th className="p-3 md:p-4">Role</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Frequency</th><th className="p-3 md:p-4 rounded-tr-xl text-right">Actions</th></tr>
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Name</th><th className="p-3 md:p-4">Role</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Frequency</th><th className="p-3 md:p-4">Off Days</th><th className="p-3 md:p-4 rounded-tr-xl text-right">Actions</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {personnel.map(p => (
@@ -717,6 +762,40 @@ export default function App() {
                             <td className="p-3 md:p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role.includes('Admin') ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
                             <td className="p-3 md:p-4 text-xs text-slate-600 max-w-[200px] truncate">{p.zones.join(', ')}</td>
                             <td className="p-3 md:p-4 font-medium">{p.freq}</td>
+                            
+                            {/* Editable Off Days Cell */}
+                            <td className="p-3 md:p-4 text-xs text-slate-600 font-medium">
+                              {editingOffDaysId === p.id ? (
+                                 <div className="flex flex-col gap-2 min-w-[200px]">
+                                   <div className="flex flex-wrap gap-2 bg-white p-2 border border-slate-200 rounded-lg shadow-inner">
+                                     {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, idx) => (
+                                       <label key={idx} className="flex items-center gap-1 cursor-pointer">
+                                         <input 
+                                           type="checkbox" 
+                                           checked={tempOffDays.includes(day)}
+                                           onChange={(e) => {
+                                             if(e.target.checked) setTempOffDays([...tempOffDays, day]);
+                                             else setTempOffDays(tempOffDays.filter(d => d !== day));
+                                           }}
+                                           className="text-orange-600 focus:ring-orange-500 rounded" 
+                                         />
+                                         <span className="leading-tight">{day.substring(0,3)}</span>
+                                       </label>
+                                     ))}
+                                   </div>
+                                   <div className="flex gap-2">
+                                     <button onClick={() => saveOffDays(p.id)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700 transition-colors">Save</button>
+                                     <button onClick={() => setEditingOffDaysId(null)} className="bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-400 transition-colors">Cancel</button>
+                                   </div>
+                                 </div>
+                              ) : (
+                                 <div className="flex items-center gap-2">
+                                   <span className="flex-1">{(p.offDays || []).join(', ') || 'None'}</span>
+                                   <button onClick={() => { setEditingOffDaysId(p.id); setTempOffDays(p.offDays || []); }} title="Edit Off Days" className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-md transition-colors"><Pencil size={14}/></button>
+                                 </div>
+                              )}
+                            </td>
+
                             <td className="p-3 md:p-4 text-right">
                                <div className="flex justify-end gap-2">
                                  <button onClick={() => editPassword(p.id)} title="Edit Password" className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Key size={16}/></button>
@@ -805,6 +884,7 @@ export default function App() {
                 </div>
               )}
 
+              {/* Inspection Form */}
               {activeTab === 'inspection-form' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
                   <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6 flex justify-between items-start print:hidden">
