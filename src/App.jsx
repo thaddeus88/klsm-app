@@ -1,4 +1,6 @@
 ﻿import React, { useState } from 'react';
+import { db } from './firebase'; // <-- 1. Connecting to your Firebase config
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <-- 2. Bringing in Cloud saving tools
 
 // We use built-in SVGs now so you don't need any external icon libraries!
 const IconWrapper = ({ children, size = 24, className = "" }) => (
@@ -56,6 +58,9 @@ export default function App() {
   const [personnel, setPersonnel] = useState(initialUsers);
   const [selectedZone, setSelectedZone] = useState(null);
   const [loginError, setLoginError] = useState('');
+  
+  // New state to show a loading screen while saving to cloud
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -119,6 +124,43 @@ export default function App() {
       }
       return p;
     }));
+  };
+
+  // --- NEW: Function to send inspection to Firebase Cloud ---
+  const handleInspectionSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      // 1. Gather all the submitted form data
+      const formData = new FormData(e.target);
+      
+      // 2. Build the exact data packet to send to Firebase
+      const inspectionData = {
+        zone: selectedZone,
+        inspectorName: currentUser.name,
+        role: currentUser.role,
+        timestamp: serverTimestamp(), // Grabs the exact cloud time
+        remarks: formData.get('remarks') || "No remarks",
+        results: {}
+      };
+
+      // 3. Loop through parameters and grab the Pass/Fail choice for each one
+      params.forEach(p => {
+        inspectionData.results[p.name] = formData.get(`param_${p.id}`);
+      });
+
+      // 4. Send it to the Firestore database! (Saves in a folder called "inspections")
+      await addDoc(collection(db, "inspections"), inspectionData);
+
+      alert('Success! Inspection saved securely to the Cloud.');
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error("Error saving to cloud:", error);
+      alert('Failed to connect to the cloud. Please check your internet or Firebase config.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const displayedZones = (currentUser?.role === 'Level 1 Admin' || currentUser?.role === 'Level 2 Admin') 
@@ -402,12 +444,13 @@ export default function App() {
                    <p className="text-sm font-bold text-orange-600 mt-1 flex items-center gap-1"><ClipboardList size={16}/> {selectedZone}</p>
                 </div>
                 
-                <div className="space-y-6">
+                {/* Form now linked to Firebase handler */}
+                <form onSubmit={handleInspectionSubmit} className="space-y-6">
                   {params.map(p => (
                     <div key={p.id} className="p-5 bg-slate-50 rounded-xl border border-slate-200">
                       <label className="font-bold text-slate-800 block mb-3 text-lg">{p.name}</label>
                       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                        <select className="w-full sm:w-auto p-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="">
+                        <select name={`param_${p.id}`} className="w-full sm:w-auto p-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="" required>
                            <option value="" disabled>Select Status...</option>
                            <option value="Pass">🟢 Pass</option>
                            <option value="Fail">🔴 Fail</option>
@@ -425,6 +468,7 @@ export default function App() {
                      <label className="font-black text-orange-900 block mb-2 text-lg">Overall Remarks / Corrective Actions</label>
                      <p className="text-xs text-orange-700 mb-3 font-medium">Add any general observations or details regarding failed parameters that require immediate attention.</p>
                      <textarea 
+                        name="remarks"
                         className="w-full p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white" 
                         rows="4" 
                         placeholder="Type your remarks here..."
@@ -432,10 +476,12 @@ export default function App() {
                   </div>
 
                   <div className="pt-6 flex gap-4">
-                     <button onClick={() => setActiveTab('dashboard')} className="w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
-                     <button onClick={() => { alert('Inspection Submitted Successfully!'); setActiveTab('dashboard'); }} className="w-2/3 bg-orange-600 text-white py-3 rounded-xl font-black text-lg hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-all">Submit Inspection</button>
+                     <button type="button" onClick={() => setActiveTab('dashboard')} className="w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
+                     <button type="submit" disabled={isSubmitting} className="w-2/3 bg-orange-600 text-white py-3 rounded-xl font-black text-lg hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-all disabled:opacity-50">
+                        {isSubmitting ? 'Saving to Cloud...' : 'Submit Inspection'}
+                     </button>
                   </div>
-                </div>
+                </form>
               </div>
             )}
           </main>
