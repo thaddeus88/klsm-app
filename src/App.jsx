@@ -3,7 +3,7 @@ import {
   LayoutDashboard, ClipboardList, ShieldAlert, Users, 
   LogOut, Plus, Trash2, Settings, Key, 
   Camera, BarChart3, UserPlus, Check, Clock, Edit2, Save,
-  TriangleAlert, Download, X
+  AlertTriangle, Download, X
 } from 'lucide-react';
 
 const initialZones = [
@@ -13,7 +13,7 @@ const initialZones = [
   "Zone 4 – Biogas Plant (Digester, Scrubber, Flare, Gas Engine, ETP)",
   "Zone 5 – Production Area",
   "Zone 6 – Store & Diesel Skid Tank",
-  "Zone 7 – Mill’s Clinic",
+  "Zone 7 - Mill's Clinic",
   "Zone 8 – Security",
   "Zone 9 – Office"
 ];
@@ -273,7 +273,7 @@ export default function App() {
           </h1>
           <nav className="space-y-2">
             <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20}/> Dashboard</button>
-            <button onClick={() => setActiveTab('report-accident')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'report-accident' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><TriangleAlert size={20}/> Report Accident</button>
+            <button onClick={() => setActiveTab('report-accident')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'report-accident' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><AlertTriangle size={20}/> Report Accident</button>
             {currentUser?.role === 'Admin' && (
               <>
                 <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> Analytics</button>
@@ -415,7 +415,7 @@ export default function App() {
           {activeTab === 'report-accident' && (
             <div className="bg-white p-6 md:p-10 rounded-2xl shadow-sm border border-red-200 max-w-3xl mx-auto">
               <div className="border-b border-slate-200 pb-6 mb-6">
-                 <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><TriangleAlert className="text-red-600"/> Report an Accident / Incident</h2>
+                 <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Report an Accident / Incident</h2>
                  <p className="text-sm font-medium text-slate-500 mt-1">Please fill out the details immediately following an incident.</p>
               </div>
               <form onSubmit={handleAccidentSubmit} className="space-y-6">
@@ -425,7 +425,7 @@ export default function App() {
                  </div>
                  <div>
                    <label className="block font-bold text-slate-700 mb-2">2. Injured Person Involved</label>
-                   <p className="text-xs text-slate-500 mb-2">Please include name, role, and days of MC (Medical Certificate) if applicable. Type "None" if no injuries.</p>
+                   <p className="text-xs text-slate-500 mb-2">Please include name, role, and days of MC (Medical Certificate) if applicable. Type &quot;None&quot; if no injuries.</p>
                    <input type="text" name="accInjured" placeholder="E.g. Ali bin Abu (Technician) - 3 Days MC" className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none" required/>
                  </div>
                  <div>
@@ -552,7 +552,7 @@ export default function App() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
-                      <tr><th className="p-4 rounded-tl-xl">Inspector</th><th className="p-4">Assigned Zones</th><th className="p-4">Target Freq.</th><th className="p-4">Today's Progress</th><th className="p-4 rounded-tr-xl">Status</th></tr>
+                      <tr><th className="p-4 rounded-tl-xl">Inspector</th><th className="p-4">Assigned Zones</th><th className="p-4">Target Freq.</th><th className="p-4">Today&apos;s Progress</th><th className="p-4 rounded-tr-xl">Status</th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {personnel.filter(p => p.role === 'Inspector').map(p => {
@@ -589,7 +589,7 @@ export default function App() {
               {/* Accident Records Table */}
               <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><TriangleAlert className="text-red-600"/> Accident / Incident Records</h3>
+                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Accident / Incident Records</h3>
                   <button className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors"><Download size={16}/> Export Excel</button>
                 </div>
                 <div className="overflow-x-auto">
