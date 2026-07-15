@@ -39,6 +39,7 @@ const ArrowLeft = (p) => <IconWrapper {...p}><path d="m12 19-7-7 7-7"/><path d="
 const Pencil = (p) => <IconWrapper {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconWrapper>;
 const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
 const Check = (p) => <IconWrapper {...p}><polyline points="20 6 9 17 4 12"/></IconWrapper>;
+const Clock = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -53,9 +54,9 @@ const initialZones = [
 ];
 
 const initialUsers = [
-  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"] },
-  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [] },
-  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [] }
+  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"], timeStart: "08:00", timeEnd: "17:00" },
+  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeStart: "00:00", timeEnd: "23:59" },
+  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeStart: "00:00", timeEnd: "23:59" }
 ];
 
 const initialParameters = [
@@ -69,7 +70,6 @@ const initialParameters = [
   { id: 8, name: "Environment", subParams: [] }
 ];
 
-// Re-built to guarantee it waits for images to load properly
 const compressImage = (file) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -91,11 +91,10 @@ const compressImage = (file) => {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        // Compress to 50% quality JPEG
         resolve(canvas.toDataURL('image/jpeg', 0.5));
       };
-      img.onerror = () => resolve(null); // Return null safely if error
-      img.src = event.target.result; // Setting src AFTER onload is bound prevents hanging!
+      img.onerror = () => resolve(null); 
+      img.src = event.target.result; 
     };
     reader.onerror = () => resolve(null);
     reader.readAsDataURL(file);
@@ -114,13 +113,17 @@ export default function App() {
   const [selectedReport, setSelectedReport] = useState(null);
   const [loginError, setLoginError] = useState('');
   const [toastMsg, setToastMsg] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); // New Loading State
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   
   const [editingItem, setEditingItem] = useState({ id: null, subId: null, text: '' });
   const [editingOffDaysId, setEditingOffDaysId] = useState(null);
   const [tempOffDays, setTempOffDays] = useState([]);
+
+  // Time allocation states
+  const [editingTimeId, setEditingTimeId] = useState(null);
+  const [tempTimeStart, setTempTimeStart] = useState("");
+  const [tempTimeEnd, setTempTimeEnd] = useState("");
   
-  // Dedicated state variables for bulletproof photo uploads
   const [attachedPhotos, setAttachedPhotos] = useState({});
   const [photoPreview, setPhotoPreview] = useState({});
 
@@ -178,7 +181,9 @@ export default function App() {
       zones: e.target.role.value.includes('Admin') ? ['All'] : checkedZones,
       freq: e.target.freq.value,
       password: e.target.password.value,
-      offDays: checkedOffDays
+      offDays: checkedOffDays,
+      timeStart: e.target.timeStart.value || "00:00",
+      timeEnd: e.target.timeEnd.value || "23:59"
     };
     
     const updatedPersonnel = [...personnel, newPerson];
@@ -213,6 +218,14 @@ export default function App() {
     await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
     setEditingOffDaysId(null);
     showToast("Off days updated successfully.");
+  };
+
+  const saveTimeWindow = async (userId) => {
+    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, timeStart: tempTimeStart, timeEnd: tempTimeEnd } : p);
+    setPersonnel(updatedPersonnel);
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+    setEditingTimeId(null);
+    showToast("Time allocation updated successfully.");
   };
 
   const addMainParam = async (e) => {
@@ -280,21 +293,17 @@ export default function App() {
     const results = {};
     const finalPhotos = {};
     
-    // 1. Process all photos locked safely in our component state
     for (const [itemKey, file] of Object.entries(attachedPhotos)) {
       if (file) {
         try {
           const base64Data = await compressImage(file);
-          if (base64Data) {
-            finalPhotos[itemKey] = base64Data; // Securely attach compressed image to payload
-          }
+          if (base64Data) finalPhotos[itemKey] = base64Data;
         } catch (err) {
           console.error("Photo compression error", err);
         }
       }
     }
 
-    // 2. Process all text results from the form
     for (let [key, value] of formData.entries()) {
       if (key.startsWith('res-')) {
         const questionName = key.replace('res-', '');
@@ -391,6 +400,27 @@ export default function App() {
   const maxCount = Math.max(...monthlyCounts, 1);
   const monthlyComp = monthlyCompData.map(d => d.count > 0 ? Math.round(d.sum / d.count) : 0);
 
+  // New Zone Performance Graph Data
+  const zonePerformanceData = initialZones.map(zone => {
+    const zoneInspections = inspections.filter(i => i.zone === zone);
+    if (zoneInspections.length === 0) return 0;
+    let memuaskan = 0; let totalScored = 0;
+    zoneInspections.forEach(insp => {
+      Object.values(insp.results || {}).forEach(val => {
+        if (val === "Memuaskan") { memuaskan++; totalScored++; }
+        if (val === "Tidak Memuaskan") { totalScored++; }
+      });
+    });
+    return totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0;
+  });
+
+  // Check Time Enforcement for Dashboard
+  const now = new Date();
+  const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+  const isTimeValid = currentUser?.role.includes('Admin') || 
+                      (!currentUser?.timeStart || !currentUser?.timeEnd) ||
+                      (currentTime >= currentUser.timeStart && currentTime <= currentUser.timeEnd);
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
       
@@ -434,7 +464,7 @@ export default function App() {
           <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
-              <h1 className="text-lg md:text-xl font-black text-orange-500 tracking-tight hidden md:block">KLSM Hub</h1>
+              <h1 className="text-lg md:text-xl font-black text-orange-500 tracking-tight hidden md:block">KLSM HSE Hub</h1>
             </div>
             
             <nav className="flex flex-row md:flex-col space-y-0 md:space-y-2 space-x-2 md:space-x-0 flex-1 overflow-x-auto no-scrollbar items-center md:items-stretch">
@@ -472,7 +502,15 @@ export default function App() {
               {/* DASHBOARD TAB */}
               {activeTab === 'dashboard' && (
                 <div className="max-w-7xl mx-auto">
-                  <h2 className="text-xl md:text-2xl font-black mb-6 text-slate-900">Your Assigned Zones</h2>
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
+                    <h2 className="text-xl md:text-2xl font-black text-slate-900">Your Assigned Zones</h2>
+                    {!currentUser?.role.includes('Admin') && (
+                      <div className={`text-sm font-bold flex items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                        <Clock size={16}/> Assigned Window: {currentUser.timeStart} - {currentUser.timeEnd}
+                      </div>
+                    )}
+                  </div>
+                  
                   {displayedZones.length === 0 ? (
                      <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500">You currently have no zones assigned to you.</div>
                   ) : (
@@ -480,9 +518,16 @@ export default function App() {
                       {displayedZones.map((zone, i) => (
                         <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-full">
                           <h3 className="font-bold mb-6 text-slate-800 leading-snug text-sm md:text-base">{zone}</h3>
-                          <button onClick={() => { setSelectedZone(zone); setActiveTab('inspection-form'); }} className="bg-slate-900 text-white w-full py-3 rounded-xl text-sm font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
-                            <ClipboardList size={18}/> Start Inspection
-                          </button>
+                          
+                          {isTimeValid ? (
+                            <button onClick={() => { setSelectedZone(zone); setActiveTab('inspection-form'); }} className="bg-slate-900 text-white w-full py-3 rounded-xl text-sm font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
+                              <ClipboardList size={18}/> Start Inspection
+                            </button>
+                          ) : (
+                            <button disabled className="bg-slate-100 text-slate-400 border border-slate-200 w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-not-allowed">
+                              <Clock size={18}/> Outside Time Window
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -557,12 +602,28 @@ export default function App() {
                          {monthlyComp.map((avg, idx) => (
                             <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
                                <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{avg}%</span>
-                               <div className={`w-full rounded-t-md transition-all duration-300 ${avg >= 90 ? 'bg-emerald-500 group-hover:bg-emerald-600' : (avg >= 70 ? 'bg-amber-500 group-hover:bg-amber-600' : 'bg-red-500 group-hover:bg-red-600')}`} style={{ height: `${avg}%`, minHeight: avg > 0 ? '4px' : '0px' }}></div>
+                               <div className={`w-full rounded-t-md transition-all duration-300 ${avg >= 90 ? 'bg-emerald-500 group-hover:bg-emerald-600' : (avg >= 70 ? 'bg-amber-500 group-hover:bg-amber-600' : (avg === 0 ? 'bg-transparent' : 'bg-red-500 group-hover:bg-red-600'))}`} style={{ height: `${avg}%`, minHeight: avg > 0 ? '4px' : '0px' }}></div>
                             </div>
                          ))}
                        </div>
                        <div className="flex gap-1 md:gap-3 mt-2">
                          {months.map(m => <div key={m} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold">{m}</div>)}
+                       </div>
+                    </div>
+                    
+                    {/* NEW: ZONE PERFORMANCE GRAPH */}
+                    <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-2">
+                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)</h3>
+                       <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200 mt-6">
+                         {zonePerformanceData.map((avg, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
+                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{avg}%</span>
+                               <div className={`w-full rounded-t-md transition-all duration-300 ${avg >= 90 ? 'bg-emerald-500 hover:bg-emerald-600' : (avg >= 70 ? 'bg-amber-500 hover:bg-amber-600' : (avg === 0 ? 'bg-slate-200 hover:bg-slate-300' : 'bg-red-500 hover:bg-red-600'))}`} style={{ height: `${avg === 0 ? 2 : avg}%` }}></div>
+                            </div>
+                         ))}
+                       </div>
+                       <div className="flex gap-1 md:gap-3 mt-2">
+                         {initialZones.map((z, idx) => <div key={idx} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold truncate px-1" title={z}>Z{idx+1}</div>)}
                        </div>
                     </div>
                   </div>
@@ -579,6 +640,7 @@ export default function App() {
                           <tr><th className="p-3 md:p-4 rounded-tl-xl">Date of Accident</th><th className="p-3 md:p-4">Reported By</th><th className="p-3 md:p-4">Injured Person & MC</th><th className="p-3 md:p-4">Property Damage</th><th className="p-3 md:p-4 rounded-tr-xl">Details</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 print:divide-slate-300">
+                          {accidents.length === 0 && <tr><td colSpan="5" className="p-4 text-center text-slate-500 italic">No accidents reported.</td></tr>}
                           {accidents.sort((a,b) => new Date(b.reportedAt) - new Date(a.reportedAt)).map(acc => (
                             <tr key={acc.id} className="hover:bg-slate-50/50">
                               <td className="p-3 md:p-4 font-bold text-slate-800">{new Date(acc.accidentDate).toLocaleString()}</td>
@@ -732,15 +794,12 @@ export default function App() {
                           let resColor = "text-slate-600";
                           if (result === "Memuaskan") resColor = "text-emerald-600";
                           if (result === "Tidak Memuaskan") resColor = "text-red-600";
-                          
-                          // Correctly mapping exact keys
                           const photoData = selectedReport.photos && selectedReport.photos[item];
 
                           return (
                             <tr key={idx} className="print:break-inside-avoid">
                               <td className="p-3 md:p-4 text-slate-800 font-medium print:text-black">
                                 {item}
-                                {/* If a photo exists for this item, display it! */}
                                 {photoData && (
                                   <div className="mt-3 mb-1">
                                     <img src={photoData} alt="Attached Evidence" className="max-w-[200px] h-auto rounded-lg border border-slate-300 shadow-sm print:max-w-[150px] print:border-black" />
@@ -778,16 +837,28 @@ export default function App() {
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">Daily Frequency</label><input name="freq" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm" required /></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">Initial Password</label><input name="password" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm" required /></div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-2">Assign Zones (Ignored for Admins)</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200 h-48 overflow-y-auto">
-                             {initialZones.map((z, idx) => (<label key={idx} className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="zone" value={z} className="mt-1 text-orange-600 focus:ring-orange-500 rounded" /><span className="leading-tight">{z}</span></label>))}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-2">Assign Zones (Ignored for Admins)</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white p-4 rounded-lg border border-slate-200 h-48 overflow-y-auto">
+                               {initialZones.map((z, idx) => (<label key={idx} className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="zone" value={z} className="mt-1 text-orange-600 focus:ring-orange-500 rounded" /><span className="leading-tight">{z}</span></label>))}
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-2">Select Off Days</label>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200">
-                             {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, idx) => (<label key={idx} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="offDays" value={day} className="text-orange-600 focus:ring-orange-500 rounded" /><span className="leading-tight">{day}</span></label>))}
+                          <div className="flex flex-col gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-2">Select Off Days</label>
+                              <div className="grid grid-cols-2 gap-2 bg-white p-4 rounded-lg border border-slate-200">
+                                 {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, idx) => (<label key={idx} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"><input type="checkbox" name="offDays" value={day} className="text-orange-600 focus:ring-orange-500 rounded" /><span className="leading-tight">{day}</span></label>))}
+                              </div>
+                            </div>
+                            <div className="bg-white p-4 rounded-lg border border-slate-200">
+                              <label className="block text-xs font-bold text-slate-500 mb-2">Inspection Time Window</label>
+                              <div className="flex items-center gap-2">
+                                <input type="time" name="timeStart" defaultValue="08:00" className="border border-slate-300 p-2 rounded-lg text-sm w-full" />
+                                <span className="text-slate-500 text-sm font-bold">to</span>
+                                <input type="time" name="timeEnd" defaultValue="17:00" className="border border-slate-300 p-2 rounded-lg text-sm w-full" />
+                              </div>
+                            </div>
                           </div>
                         </div>
                         <button type="submit" className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600"><UserPlus size={16}/> Add Personnel</button>
@@ -797,15 +868,15 @@ export default function App() {
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                       <table className="w-full text-sm text-left min-w-[600px]">
                         <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
-                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Name</th><th className="p-3 md:p-4">Role</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Freq.</th><th className="p-3 md:p-4">Off Days</th><th className="p-3 md:p-4 rounded-tr-xl text-right">Actions</th></tr>
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Name</th><th className="p-3 md:p-4">Role</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Off Days</th><th className="p-3 md:p-4">Time Window</th><th className="p-3 md:p-4 rounded-tr-xl text-right">Actions</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {personnel.map(p => (
                           <tr key={p.id} className="hover:bg-slate-50/50">
                             <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
                             <td className="p-3 md:p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role.includes('Admin') ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
-                            <td className="p-3 md:p-4 text-xs text-slate-600 max-w-[200px] truncate">{p.zones.join(', ')}</td>
-                            <td className="p-3 md:p-4 font-medium">{p.freq}</td>
+                            <td className="p-3 md:p-4 text-xs text-slate-600 max-w-[150px] truncate">{p.zones.join(', ')}</td>
+                            
                             <td className="p-3 md:p-4 text-xs text-slate-600 font-medium">
                               {editingOffDaysId === p.id ? (
                                  <div className="flex flex-col gap-2 min-w-[200px]">
@@ -826,10 +897,32 @@ export default function App() {
                                  <div className="flex items-center gap-2"><span className="flex-1">{(p.offDays || []).join(', ') || 'None'}</span><button onClick={() => { setEditingOffDaysId(p.id); setTempOffDays(p.offDays || []); }} className="p-1.5 text-slate-400 hover:text-orange-600 rounded-md"><Pencil size={14}/></button></div>
                               )}
                             </td>
+
+                            <td className="p-3 md:p-4 text-xs text-slate-600 font-medium">
+                              {editingTimeId === p.id ? (
+                                 <div className="flex flex-col gap-2 min-w-[180px]">
+                                   <div className="flex items-center gap-2 bg-white p-2 border border-slate-200 rounded-lg">
+                                     <input type="time" value={tempTimeStart} onChange={e => setTempTimeStart(e.target.value)} className="border border-slate-300 p-1 rounded w-full" />
+                                     <span>-</span>
+                                     <input type="time" value={tempTimeEnd} onChange={e => setTempTimeEnd(e.target.value)} className="border border-slate-300 p-1 rounded w-full" />
+                                   </div>
+                                   <div className="flex gap-2">
+                                     <button onClick={() => saveTimeWindow(p.id)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700">Save</button>
+                                     <button onClick={() => setEditingTimeId(null)} className="bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-400">Cancel</button>
+                                   </div>
+                                 </div>
+                              ) : (
+                                 <div className="flex items-center gap-2">
+                                   <span className="flex-1 whitespace-nowrap bg-slate-100 px-2 py-1 rounded border border-slate-200">{p.timeStart || '00:00'} - {p.timeEnd || '23:59'}</span>
+                                   <button onClick={() => { setEditingTimeId(p.id); setTempTimeStart(p.timeStart || '00:00'); setTempTimeEnd(p.timeEnd || '23:59'); }} className="p-1.5 text-slate-400 hover:text-orange-600 rounded-md"><Pencil size={14}/></button>
+                                 </div>
+                              )}
+                            </td>
+
                             <td className="p-3 md:p-4 text-right">
                                <div className="flex justify-end gap-2">
-                                 <button onClick={() => editPassword(p.id)} className="p-2 text-slate-400 hover:text-orange-600 rounded-lg"><Key size={16}/></button>
-                                 <button onClick={() => deleteUser(p.id)} className="p-2 text-slate-400 hover:text-red-600 rounded-lg"><Trash2 size={16}/></button>
+                                 <button onClick={() => editPassword(p.id)} className="p-2 text-slate-400 hover:text-orange-600 rounded-lg" title="Edit Password"><Key size={16}/></button>
+                                 <button onClick={() => deleteUser(p.id)} className="p-2 text-slate-400 hover:text-red-600 rounded-lg" title="Delete User"><Trash2 size={16}/></button>
                                </div>
                             </td>
                           </tr>
@@ -921,7 +1014,6 @@ export default function App() {
                                         <option value="N/A">⚪ N/A</option>
                                      </select>
                                      
-                                     {/* BULLETPROOF PHOTO UPLOAD BUTTON */}
                                      <label 
                                         className={`flex items-center justify-center p-2 border rounded-lg transition-colors cursor-pointer ${photoPreview[itemKey] ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-inner' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-orange-600'}`} 
                                         title={photoPreview[itemKey] ? "Photo Attached!" : "Attach Photo"}
@@ -935,7 +1027,6 @@ export default function App() {
                                           onChange={(e) => {
                                             if (e.target.files && e.target.files[0]) {
                                               const file = e.target.files[0];
-                                              // Save directly into reliable React state
                                               setAttachedPhotos(prev => ({...prev, [itemKey]: file}));
                                               setPhotoPreview(prev => ({...prev, [itemKey]: true}));
                                             }
