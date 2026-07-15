@@ -519,7 +519,13 @@ export default function App() {
               {activeTab === 'dashboard' && (
                 <div className="max-w-7xl mx-auto">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
-                    <h2 className="text-xl md:text-2xl font-black text-slate-900">Your Assigned Zones</h2>
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-black text-slate-900">Your Assigned Zones</h2>
+                      <div className="text-sm font-bold text-slate-500 mt-1.5 flex items-center gap-1.5">
+                        <ClipboardList size={16} className="text-orange-500"/>
+                        Target Daily Requirement: <span className="text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200">{currentUser?.freq || 'N/A'}</span>
+                      </div>
+                    </div>
                     <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                       <Clock size={16}/> Assigned Window: {userWindows.map((w,i) => <span key={i} className="bg-white/50 px-1 rounded">{w.start}-{w.end}</span>)}
                     </div>
