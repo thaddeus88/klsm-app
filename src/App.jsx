@@ -2,7 +2,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, doc, setDoc, onSnapshot } from "firebase/firestore";
 
-// Firebase Configuration embedded directly for single-file compilation
 const firebaseConfig = {
   apiKey: "AIzaSyCg7JF2MVE76XmTe78YohYL528-myxmUcw",
   authDomain: "klsm-workplace-inspection-hub.firebaseapp.com",
@@ -54,9 +53,9 @@ const initialZones = [
 ];
 
 const initialUsers = [
-  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"], timeStart: "08:00", timeEnd: "17:00" },
-  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeStart: "00:00", timeEnd: "23:59" },
-  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeStart: "00:00", timeEnd: "23:59" }
+  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"], timeWindows: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] },
+  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] }
 ];
 
 const initialParameters = [
@@ -119,10 +118,10 @@ export default function App() {
   const [editingOffDaysId, setEditingOffDaysId] = useState(null);
   const [tempOffDays, setTempOffDays] = useState([]);
 
-  // Time allocation states
+  // Time allocation states for multiple windows
   const [editingTimeId, setEditingTimeId] = useState(null);
-  const [tempTimeStart, setTempTimeStart] = useState("");
-  const [tempTimeEnd, setTempTimeEnd] = useState("");
+  const [tempTimeWindows, setTempTimeWindows] = useState([]);
+  const [newTimeWindows, setNewTimeWindows] = useState([{ start: '08:00', end: '17:00' }]);
   
   const [attachedPhotos, setAttachedPhotos] = useState({});
   const [photoPreview, setPhotoPreview] = useState({});
@@ -182,14 +181,14 @@ export default function App() {
       freq: e.target.freq.value,
       password: e.target.password.value,
       offDays: checkedOffDays,
-      timeStart: e.target.timeStart.value || "00:00",
-      timeEnd: e.target.timeEnd.value || "23:59"
+      timeWindows: newTimeWindows
     };
     
     const updatedPersonnel = [...personnel, newPerson];
     setPersonnel(updatedPersonnel);
     await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
     e.target.reset();
+    setNewTimeWindows([{ start: '08:00', end: '17:00' }]);
     showToast("New personnel added to cloud.");
   };
 
@@ -221,7 +220,7 @@ export default function App() {
   };
 
   const saveTimeWindow = async (userId) => {
-    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, timeStart: tempTimeStart, timeEnd: tempTimeEnd } : p);
+    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, timeWindows: tempTimeWindows } : p);
     setPersonnel(updatedPersonnel);
     await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
     setEditingTimeId(null);
@@ -400,7 +399,6 @@ export default function App() {
   const maxCount = Math.max(...monthlyCounts, 1);
   const monthlyComp = monthlyCompData.map(d => d.count > 0 ? Math.round(d.sum / d.count) : 0);
 
-  // New Zone Performance Graph Data
   const zonePerformanceData = initialZones.map(zone => {
     const zoneInspections = inspections.filter(i => i.zone === zone);
     if (zoneInspections.length === 0) return 0;
@@ -414,12 +412,13 @@ export default function App() {
     return totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0;
   });
 
-  // Check Time Enforcement for Dashboard
   const now = new Date();
   const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+  
+  // Multi-window time validation
+  const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
   const isTimeValid = currentUser?.role.includes('Admin') || 
-                      (!currentUser?.timeStart || !currentUser?.timeEnd) ||
-                      (currentTime >= currentUser.timeStart && currentTime <= currentUser.timeEnd);
+                      userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
@@ -505,8 +504,8 @@ export default function App() {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
                     <h2 className="text-xl md:text-2xl font-black text-slate-900">Your Assigned Zones</h2>
                     {!currentUser?.role.includes('Admin') && (
-                      <div className={`text-sm font-bold flex items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                        <Clock size={16}/> Assigned Window: {currentUser.timeStart} - {currentUser.timeEnd}
+                      <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                        <Clock size={16}/> Assigned Window: {userWindows.map((w,i) => <span key={i} className="bg-white/50 px-1 rounded">{w.start}-{w.end}</span>)}
                       </div>
                     )}
                   </div>
@@ -585,8 +584,8 @@ export default function App() {
                        <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Monthly Inspections ({currentYear})</h3>
                        <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200 mt-6">
                          {monthlyCounts.map((count, idx) => (
-                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group">
-                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">{count}</span>
+                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
+                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{count}</span>
                                <div className="w-full bg-orange-500 rounded-t-md transition-all duration-300 group-hover:bg-orange-600" style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0px' }}></div>
                             </div>
                          ))}
@@ -852,11 +851,17 @@ export default function App() {
                               </div>
                             </div>
                             <div className="bg-white p-4 rounded-lg border border-slate-200">
-                              <label className="block text-xs font-bold text-slate-500 mb-2">Inspection Time Window</label>
-                              <div className="flex items-center gap-2">
-                                <input type="time" name="timeStart" defaultValue="08:00" className="border border-slate-300 p-2 rounded-lg text-sm w-full" />
-                                <span className="text-slate-500 text-sm font-bold">to</span>
-                                <input type="time" name="timeEnd" defaultValue="17:00" className="border border-slate-300 p-2 rounded-lg text-sm w-full" />
+                              <label className="block text-xs font-bold text-slate-500 mb-2">Inspection Time Windows</label>
+                              <div className="flex flex-col gap-2">
+                                {newTimeWindows.map((tw, idx) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <input type="time" value={tw.start} onChange={(e) => { const nw = [...newTimeWindows]; nw[idx].start = e.target.value; setNewTimeWindows(nw); }} className="border border-slate-300 p-2 rounded-lg text-sm w-full" />
+                                    <span className="text-slate-500 text-sm font-bold">to</span>
+                                    <input type="time" value={tw.end} onChange={(e) => { const nw = [...newTimeWindows]; nw[idx].end = e.target.value; setNewTimeWindows(nw); }} className="border border-slate-300 p-2 rounded-lg text-sm w-full" />
+                                    {idx > 0 && <button type="button" onClick={() => setNewTimeWindows(newTimeWindows.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-700"><Trash2 size={16}/></button>}
+                                  </div>
+                                ))}
+                                <button type="button" onClick={() => setNewTimeWindows([...newTimeWindows, {start: "08:00", end: "17:00"}])} className="text-xs text-orange-600 font-bold flex items-center gap-1 mt-1 w-max"><Plus size={14}/> Add Time Window</button>
                               </div>
                             </div>
                           </div>
@@ -868,7 +873,7 @@ export default function App() {
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                       <table className="w-full text-sm text-left min-w-[600px]">
                         <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
-                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Name</th><th className="p-3 md:p-4">Role</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Off Days</th><th className="p-3 md:p-4">Time Window</th><th className="p-3 md:p-4 rounded-tr-xl text-right">Actions</th></tr>
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Name</th><th className="p-3 md:p-4">Role</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Off Days</th><th className="p-3 md:p-4 min-w-[180px]">Time Windows</th><th className="p-3 md:p-4 rounded-tr-xl text-right">Actions</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {personnel.map(p => (
@@ -900,11 +905,17 @@ export default function App() {
 
                             <td className="p-3 md:p-4 text-xs text-slate-600 font-medium">
                               {editingTimeId === p.id ? (
-                                 <div className="flex flex-col gap-2 min-w-[180px]">
-                                   <div className="flex items-center gap-2 bg-white p-2 border border-slate-200 rounded-lg">
-                                     <input type="time" value={tempTimeStart} onChange={e => setTempTimeStart(e.target.value)} className="border border-slate-300 p-1 rounded w-full" />
-                                     <span>-</span>
-                                     <input type="time" value={tempTimeEnd} onChange={e => setTempTimeEnd(e.target.value)} className="border border-slate-300 p-1 rounded w-full" />
+                                 <div className="flex flex-col gap-2">
+                                   <div className="flex flex-col gap-1 bg-white p-2 border border-slate-200 rounded-lg max-h-32 overflow-y-auto">
+                                     {tempTimeWindows.map((tw, idx) => (
+                                       <div key={idx} className="flex items-center gap-1">
+                                         <input type="time" value={tw.start} onChange={e => { const nw = [...tempTimeWindows]; nw[idx].start = e.target.value; setTempTimeWindows(nw); }} className="border border-slate-300 p-1 rounded w-full" />
+                                         <span>-</span>
+                                         <input type="time" value={tw.end} onChange={e => { const nw = [...tempTimeWindows]; nw[idx].end = e.target.value; setTempTimeWindows(nw); }} className="border border-slate-300 p-1 rounded w-full" />
+                                         <button onClick={() => setTempTimeWindows(tempTimeWindows.filter((_, i) => i !== idx))} className="text-red-500 p-1 hover:bg-red-50 rounded"><Trash2 size={12}/></button>
+                                       </div>
+                                     ))}
+                                     <button onClick={() => setTempTimeWindows([...tempTimeWindows, {start: "08:00", end: "17:00"}])} className="text-[10px] text-orange-600 font-bold self-start mt-1 flex items-center gap-1"><Plus size={10}/> Add Window</button>
                                    </div>
                                    <div className="flex gap-2">
                                      <button onClick={() => saveTimeWindow(p.id)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700">Save</button>
@@ -912,9 +923,13 @@ export default function App() {
                                    </div>
                                  </div>
                               ) : (
-                                 <div className="flex items-center gap-2">
-                                   <span className="flex-1 whitespace-nowrap bg-slate-100 px-2 py-1 rounded border border-slate-200">{p.timeStart || '00:00'} - {p.timeEnd || '23:59'}</span>
-                                   <button onClick={() => { setEditingTimeId(p.id); setTempTimeStart(p.timeStart || '00:00'); setTempTimeEnd(p.timeEnd || '23:59'); }} className="p-1.5 text-slate-400 hover:text-orange-600 rounded-md"><Pencil size={14}/></button>
+                                 <div className="flex items-start gap-2">
+                                   <div className="flex flex-col gap-1 flex-1">
+                                     {(p.timeWindows || [{start: p.timeStart || '00:00', end: p.timeEnd || '23:59'}]).map((w, i) => (
+                                        <span key={i} className="whitespace-nowrap bg-slate-100 px-2 py-1 rounded border border-slate-200">{w.start || '00:00'} - {w.end || '23:59'}</span>
+                                     ))}
+                                   </div>
+                                   <button onClick={() => { setEditingTimeId(p.id); setTempTimeWindows(p.timeWindows || [{start: p.timeStart || '00:00', end: p.timeEnd || '23:59'}]); }} className="p-1.5 text-slate-400 hover:text-orange-600 rounded-md"><Pencil size={14}/></button>
                                  </div>
                               )}
                             </td>
@@ -1007,7 +1022,7 @@ export default function App() {
                                    <label className="font-medium text-slate-700 text-sm flex-1 print:text-black">{sp.text}</label>
                                    
                                    <div className="flex w-full sm:w-auto gap-2 items-center print:hidden">
-                                     <select name={`res-${itemKey}`} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="" required>
+                                     <select name={`res-${itemKey}`} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none bg-white" defaultValue="" required>
                                         <option value="" disabled>Pilih Status...</option>
                                         <option value="Memuaskan">🟢 Memuaskan</option>
                                         <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
