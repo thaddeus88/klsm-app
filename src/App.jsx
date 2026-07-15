@@ -1,29 +1,29 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { db } from './firebase'; 
+import { collection, addDoc, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-// Inline SVG Icon Components to bypass Vercel dependency errors
 const IconWrapper = ({ children, size = 24, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
 );
-
+const ShieldAlert = (p) => <IconWrapper {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></IconWrapper>;
 const LayoutDashboard = (p) => <IconWrapper {...p}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></IconWrapper>;
 const ClipboardList = (p) => <IconWrapper {...p}><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></IconWrapper>;
-const ShieldAlert = (p) => <IconWrapper {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></IconWrapper>;
 const Users = (p) => <IconWrapper {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></IconWrapper>;
 const LogOut = (p) => <IconWrapper {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></IconWrapper>;
-const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
-const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
 const Settings = (p) => <IconWrapper {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></IconWrapper>;
 const Key = (p) => <IconWrapper {...p}><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></IconWrapper>;
 const Camera = (p) => <IconWrapper {...p}><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></IconWrapper>;
 const BarChart3 = (p) => <IconWrapper {...p}><path d="M3 3v18h18"/><rect width="4" height="7" x="7" y="10" rx="1"/><rect width="4" height="12" x="15" y="5" rx="1"/></IconWrapper>;
 const UserPlus = (p) => <IconWrapper {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></IconWrapper>;
-const Check = (p) => <IconWrapper {...p}><path d="M20 6 9 17l-5-5"/></IconWrapper>;
-const Clock = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
-const Edit2 = (p) => <IconWrapper {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconWrapper>;
-const Save = (p) => <IconWrapper {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></IconWrapper>;
-const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></IconWrapper>;
-const Download = (p) => <IconWrapper {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></IconWrapper>;
-const X = (p) => <IconWrapper {...p}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></IconWrapper>;
+const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
+const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
+const Activity = (p) => <IconWrapper {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></IconWrapper>;
+const FileText = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></IconWrapper>;
+const FileSpreadsheet = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></IconWrapper>;
+const Eye = (p) => <IconWrapper {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></IconWrapper>;
+const ArrowLeft = (p) => <IconWrapper {...p}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></IconWrapper>;
+const Pencil = (p) => <IconWrapper {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconWrapper>;
+const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -32,87 +32,82 @@ const initialZones = [
   "Zone 4 – Biogas Plant (Digester, Scrubber, Flare, Gas Engine, ETP)",
   "Zone 5 – Production Area",
   "Zone 6 – Store & Diesel Skid Tank",
-  "Zone 7 - Mill's Clinic",
+  "Zone 7 – Mill’s Clinic",
   "Zone 8 – Security",
   "Zone 9 – Office"
 ];
 
-const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
 const initialUsers = [
-  { 
-    id: 1, 
-    name: "John Doe", 
-    role: "Inspector", 
-    zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], 
-    freq: "2 times/day", 
-    password: "1234",
-    timeWindows: [{ start: "08:00", end: "10:00" }, { start: "14:00", end: "16:00" }],
-    offDays: ["Sunday"]
-  },
-  { 
-    id: 2, 
-    name: "Admin Jane", 
-    role: "Admin", 
-    zones: ["All"], 
-    freq: "N/A", 
-    password: "1234",
-    timeWindows: [{ start: "00:00", end: "23:59" }],
-    offDays: []
-  }
+  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"] },
+  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [] },
+  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [] }
 ];
 
 const initialParameters = [
-  { id: 1, name: "Management & Documented Information" },
-  { id: 2, name: "Housekeeping" },
-  { id: 3, name: "PPE" },
-  { id: 4, name: "Machinery Safety" },
-  { id: 5, name: "Electrical Safety" },
-  { id: 6, name: "Chemical Safety" },
-  { id: 7, name: "Fire Fighting & Emergency" },
-  { id: 8, name: "Environment" }
+  { id: 1, name: "Management & Documented Information", subParams: [] },
+  { id: 2, name: "Housekeeping", subParams: [] },
+  { id: 3, name: "PPE", subParams: [] },
+  { id: 4, name: "Machinery Safety", subParams: [] },
+  { id: 5, name: "Electrical Safety", subParams: [] },
+  { id: 6, name: "Chemical Safety", subParams: [] },
+  { id: 7, name: "Fire Fighting & Emergency", subParams: [] },
+  { id: 8, name: "Environment", subParams: [] }
 ];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('login');
-  const [params] = useState(initialParameters);
+  const [params, setParams] = useState(initialParameters);
   const [personnel, setPersonnel] = useState(initialUsers);
-  const [selectedZone, setSelectedZone] = useState(null);
-  const [loginError, setLoginError] = useState('');
   const [inspections, setInspections] = useState([]);
   const [accidents, setAccidents] = useState([]);
-
-  // Time Lock State
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
   
-  // Form States
-  const [photoPreview, setPhotoPreview] = useState({});
-  const [attachedPhotos, setAttachedPhotos] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [loginError, setLoginError] = useState('');
+  const [toastMsg, setToastMsg] = useState(null);
+  
+  // State for editing parameters
+  const [editingItem, setEditingItem] = useState({ id: null, subId: null, text: '' });
+  
+  // State for editing off-days
+  const [editingOffDaysId, setEditingOffDaysId] = useState(null);
+  const [tempOffDays, setTempOffDays] = useState([]);
 
-  // Edit Personnel State
-  const [editingUserId, setEditingUserId] = useState(null);
-  const [editUserForm, setEditUserForm] = useState(null);
-
-  // Form states for adding new user
-  const [newUserWindows, setNewUserWindows] = useState([{ start: "08:00", end: "17:00" }]);
-  const [newUserOffDays, setNewUserOffDays] = useState([]);
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
-    }, 10000);
-    return () => clearInterval(timer);
+    const unsubParams = onSnapshot(doc(db, "settings", "parameters"), (docSnap) => {
+      if (docSnap.exists()) {
+        setParams(docSnap.data().paramsList);
+      } else {
+        setDoc(doc(db, "settings", "parameters"), { paramsList: initialParameters });
+      }
+    });
+
+    const unsubPersonnel = onSnapshot(doc(db, "settings", "personnel"), (docSnap) => {
+      if (docSnap.exists()) {
+        setPersonnel(docSnap.data().personnelList);
+      } else {
+        setDoc(doc(db, "settings", "personnel"), { personnelList: initialUsers });
+      }
+    });
+
+    const unsubInspections = onSnapshot(collection(db, "inspections"), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setInspections(data);
+    });
+
+    const unsubAccidents = onSnapshot(collection(db, "accidents"), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAccidents(data);
+    });
+
+    return () => { unsubParams(); unsubPersonnel(); unsubInspections(); unsubAccidents(); };
   }, []);
-
-  const userWindows = currentUser?.timeWindows || [{ start: "00:00", end: "23:59" }];
-  const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
-
-  const checkIsOffDay = (user) => {
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-    return user.offDays?.includes(today);
-  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -124,140 +119,234 @@ export default function App() {
     if (user && user.password === password) {
       setCurrentUser(user);
       setActiveTab('dashboard');
+      showToast(`Welcome back, ${user.name}!`);
     } else {
       setLoginError('Incorrect password. Please try again.');
     }
   };
 
-  const resetPassword = (userId) => {
-    const newPass = prompt("Enter new password for this user:");
-    if (newPass) {
-      setPersonnel(personnel.map(p => p.id === userId ? { ...p, password: newPass } : p));
-      alert("Password updated successfully.");
-    }
-  };
-
-  const addPersonnel = (e) => {
+  const addPersonnel = async (e) => {
     e.preventDefault();
-    const checkedZones = Array.from(e.target.zone)
-      .filter(checkbox => checkbox.checked)
-      .map(checkbox => checkbox.value);
-
+    const checkedZones = Array.from(e.target.querySelectorAll('input[name="zone"]:checked')).map(cb => cb.value);
+    const checkedOffDays = Array.from(e.target.querySelectorAll('input[name="offDays"]:checked')).map(cb => cb.value);
     const newPerson = {
       id: Date.now(),
       name: e.target.name.value,
       role: e.target.role.value,
-      zones: e.target.role.value === 'Admin' ? ['All'] : checkedZones,
+      zones: e.target.role.value.includes('Admin') ? ['All'] : checkedZones,
       freq: e.target.freq.value,
       password: e.target.password.value,
-      timeWindows: [...newUserWindows],
-      offDays: [...newUserOffDays]
+      offDays: checkedOffDays
     };
-    setPersonnel([...personnel, newPerson]);
-    setNewUserWindows([{ start: "08:00", end: "17:00" }]);
-    setNewUserOffDays([]);
-    e.target.reset();
-    alert("Personnel added successfully!");
-  };
-
-  const saveEditedUser = () => {
-    setPersonnel(personnel.map(p => p.id === editUserForm.id ? editUserForm : p));
-    setEditingUserId(null);
-    setEditUserForm(null);
-  };
-
-  const handleInspectionSubmit = (e) => {
-    e.preventDefault();
     
-    // Hard check on time expiration at the moment of submission
-    if (!isTimeValid) {
-       alert('❌ Time window expired. Cannot submit inspection.');
-       return;
+    const updatedPersonnel = [...personnel, newPerson];
+    setPersonnel(updatedPersonnel);
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+    e.target.reset();
+    showToast("New personnel added to cloud.");
+  };
+
+  const editPassword = async (userId) => {
+    const newPass = prompt("Enter new password for this user:");
+    if (newPass && newPass.trim() !== "") {
+      const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, password: newPass } : p);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+      showToast("Password updated successfully.");
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    if(window.confirm("Are you sure you want to delete this user?")) {
+      const updatedPersonnel = personnel.filter(u => u.id !== userId);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+      showToast("Personnel deleted.");
+    }
+  };
+
+  // Function to instantly save edited Off Days
+  const saveOffDays = async (userId) => {
+    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, offDays: tempOffDays } : p);
+    setPersonnel(updatedPersonnel);
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+    setEditingOffDaysId(null);
+    showToast("Off days updated successfully.");
+  };
+
+  const addMainParam = async (e) => {
+    e.preventDefault();
+    const text = e.target.newMainParam.value.trim();
+    if (!text) return;
+    const newParam = { id: Date.now(), name: text, subParams: [] };
+    const updatedParams = [...params, newParam];
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    e.target.reset();
+    showToast("New parameter category added.");
+  };
+
+  const deleteMainParam = async (paramId) => {
+    if(window.confirm("Delete this entire category and all its items?")) {
+      const updatedParams = params.filter(p => p.id !== paramId);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+      showToast("Parameter category removed.");
+    }
+  };
+
+  const addSubParam = async (e, paramId) => {
+    e.preventDefault();
+    const text = e.target.subParamText.value.trim();
+    if (!text) return;
+    const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: [...p.subParams, { id: Date.now(), text }] } : p);
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    e.target.reset();
+  };
+
+  const removeSubParam = async (paramId, subParamId) => {
+    if(window.confirm("Remove this checklist item?")) {
+      const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: p.subParams.filter(sp => sp.id !== subParamId) } : p);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editingItem.text.trim()) {
+      setEditingItem({ id: null, subId: null, text: '' });
+      return;
     }
 
-    setIsSubmitting(true);
-    
-    // Gather results
-    const formData = new FormData(e.target);
-    let results = {};
-    params.forEach(p => {
-       results[p.id] = formData.get(`res-${p.id}`);
-    });
+    let updatedParams;
+    if (editingItem.subId === null) {
+      updatedParams = params.map(p => p.id === editingItem.id ? { ...p, name: editingItem.text } : p);
+    } else {
+      updatedParams = params.map(p => {
+        if (p.id === editingItem.id) {
+          return {
+            ...p,
+            subParams: p.subParams.map(sp => sp.id === editingItem.subId ? { ...sp, text: editingItem.text } : sp)
+          };
+        }
+        return p;
+      });
+    }
 
-    const newInspection = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      zone: selectedZone,
-      inspector: currentUser.name,
-      results: results,
-      remarks: formData.get('remarks'),
-      photos: attachedPhotos // Saves the attached photos to memory
-    };
-
-    setTimeout(() => {
-      setInspections([...inspections, newInspection]);
-      setIsSubmitting(false);
-      setPhotoPreview({});
-      setAttachedPhotos({});
-      setActiveTab('dashboard');
-      alert('✅ Inspection Submitted Successfully!');
-    }, 1500); // Simulate processing time
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    setEditingItem({ id: null, subId: null, text: '' });
+    showToast("Parameter updated successfully.");
   };
 
-  const handleAccidentSubmit = (e) => {
+  const handleInspectionSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const newAccident = {
-      id: Date.now(),
-      date: formData.get('accDate'),
-      injured: formData.get('accInjured'),
-      damage: formData.get('accDamage'),
-      details: formData.get('accDetails'),
-      reportedBy: currentUser.name,
-      timestamp: new Date().toISOString()
+    const results = {};
+    
+    for (let [key, value] of formData.entries()) {
+      if (key.startsWith('res-')) {
+        const questionName = key.replace('res-', '');
+        results[questionName] = value;
+      }
+    }
+
+    const inspectionData = {
+      zone: selectedZone,
+      inspectorName: currentUser.name,
+      date: new Date().toISOString(),
+      remarks: formData.get('remarks') || "None",
+      results: results
     };
-    setAccidents([...accidents, newAccident]);
-    e.target.reset();
-    setActiveTab('dashboard');
-    alert('🚨 Accident Report Submitted Successfully!');
+
+    try {
+      await addDoc(collection(db, "inspections"), inspectionData);
+      showToast('✅ Inspection Submitted Successfully!');
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      showToast('❌ Error submitting inspection.');
+    }
   };
 
-  const displayedZones = currentUser?.role === 'Admin' 
-    ? initialZones 
-    : initialZones.filter(z => currentUser?.zones.includes(z));
+  const handleAccidentSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
 
-  const zonePerformanceData = initialZones.map(zone => {
-    const zoneInspections = inspections.filter(i => i.zone === zone);
-    if (zoneInspections.length === 0) return 0;
-    let memuaskan = 0; let totalScored = 0;
-    zoneInspections.forEach(insp => {
-      Object.values(insp.results || {}).forEach(val => {
-        if (val === "Memuaskan" || val === "Pass") { memuaskan++; totalScored++; }
-        if (val === "Tidak Memuaskan" || val === "Fail") { totalScored++; }
-      });
-    });
-    return totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0;
-  });
+    const accidentData = {
+      accidentDate: formData.get('accidentDate'),
+      injuredPerson: formData.get('injuredPerson') || "None",
+      damage: formData.get('damage') || "None",
+      details: formData.get('details'),
+      reportedBy: currentUser.name,
+      reportedAt: new Date().toISOString()
+    };
 
-  const allMonthlyCounts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIdx => {
-    return inspections.filter(i => new Date(i.date).getMonth() === monthIdx).length;
-  });
-  const maxMonthlyScale = Math.max(10, Math.ceil(Math.max(...allMonthlyCounts) / 10) * 10);
+    try {
+      await addDoc(collection(db, "accidents"), accidentData);
+      showToast('🚨 Accident Report Submitted Successfully!');
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error("Error adding accident report: ", error);
+      showToast('❌ Error submitting report.');
+    }
+  };
 
-  if (activeTab === 'login') {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col justify-between items-center w-full font-sans">
-        <div className="flex-1 flex items-center justify-center w-full px-4">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600">
+  const exportToExcel = () => {
+    if (inspections.length === 0) {
+      showToast("No data to export.");
+      return;
+    }
+    const headers = "Date,Zone,Inspector,Remarks\n";
+    const rows = inspections.map(i => `"${new Date(i.date).toLocaleString()}","${i.zone}","${i.inspectorName}","${(i.remarks||'').replace(/"/g, '""')}"`).join("\n");
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'KLSM_Historical_Inspections.csv';
+    a.click();
+    showToast("Excel downloaded!");
+  };
+
+  const exportAccidentsToExcel = () => {
+    if (accidents.length === 0) {
+      showToast("No accident data to export.");
+      return;
+    }
+    const headers = "Reported Date,Date of Accident,Injured Person & MC,Property/Equipment Damage,Accident Details,Reported By\n";
+    const rows = accidents.map(a => `"${new Date(a.reportedAt).toLocaleString()}","${new Date(a.accidentDate).toLocaleString().replace(',', '')}","${(a.injuredPerson||'').replace(/"/g, '""')}","${(a.damage||'').replace(/"/g, '""')}","${(a.details||'').replace(/"/g, '""')}","${a.reportedBy}"`).join("\n");
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'KLSM_Accident_Reports.csv';
+    a.click();
+    showToast("Accident Excel downloaded!");
+  };
+
+  const displayedZones = currentUser?.role.includes('Admin') ? initialZones : initialZones.filter(z => currentUser?.zones.includes(z));
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
+      
+      {}
+      {/* Toast Notification System */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 bg-slate-900 text-white font-bold px-6 py-4 rounded-xl shadow-2xl z-50 animate-bounce print:hidden border border-slate-700 flex items-center gap-2">
+          {toastMsg}
+        </div>
+      )}
+
+      {/* Login Screen */}
+      {activeTab === 'login' ? (
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center w-full relative p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600 relative z-10">
             <ShieldAlert className="mx-auto text-orange-600 mb-4" size={48} />
             <h1 className="text-2xl font-black mb-2 text-slate-900 tracking-tight">KLSM HSE Hub</h1>
             <p className="text-sm text-slate-500 mb-6 font-medium">Authorized Personnel Only</p>
             
-            {loginError && (
-              <div className="mb-4 p-2 bg-red-50 text-red-600 text-sm rounded-lg font-semibold border border-red-200">
-                {loginError}
-              </div>
-            )}
+            {loginError && <div className="mb-4 p-2 bg-red-50 text-red-600 text-sm rounded-lg font-semibold border border-red-200">{loginError}</div>}
 
             <form onSubmit={handleLogin} className="space-y-4 text-left">
               <div>
@@ -268,535 +357,606 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
-                <input type="password" name="password" placeholder="Enter password" className="w-full p-3 border border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
+                <input type="password" name="password" placeholder="Enter password" defaultValue="1234" className="w-full p-3 border border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-orange-500 outline-none" required />
               </div>
               <button type="submit" className="w-full bg-orange-600 text-white p-3 rounded-lg font-bold hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-all">Secure Login</button>
             </form>
           </div>
-        </div>
-        <div className="text-center p-6 text-xs text-slate-500 font-medium">
-          © 2026 KLSMHSE • Developed by ThadYap
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
-      
-      {/* SIDEBAR */}
-      <aside className="w-full md:w-64 bg-slate-900 text-white flex flex-col border-r border-slate-800 shadow-xl z-10 print:hidden">
-        <div className="p-6">
-          <h1 className="text-xl font-black mb-8 text-orange-500 tracking-tight flex items-center gap-2">
-            <ShieldAlert size={24}/> KLSM HSE Hub
-          </h1>
-          <nav className="space-y-2">
-            <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20}/> Dashboard</button>
-            <button onClick={() => setActiveTab('report-accident')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'report-accident' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><AlertTriangle size={20}/> Report Accident</button>
-            {currentUser?.role === 'Admin' && (
-              <>
-                <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> Analytics</button>
-                <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20}/> Settings</button>
-              </>
-            )}
-          </nav>
-        </div>
-        <div className="mt-auto p-6 border-t border-slate-800">
-           <p className="text-xs text-slate-400 font-semibold mb-1">Logged in as:</p>
-           <p className="text-sm font-bold text-white mb-4">{currentUser.name}</p>
-           <button onClick={() => {setCurrentUser(null); setActiveTab('login');}} className="flex items-center gap-3 w-full p-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl font-bold transition-colors"><LogOut size={20}/> Sign Out</button>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           
-          {/* DASHBOARD TAB */}
-          {activeTab === 'dashboard' && (
-            <div className="max-w-7xl mx-auto">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900">Your Assigned Zones</h2>
-                  <div className="mt-2 inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-sm font-bold">
-                    <ClipboardList size={16}/> Daily Requirement: {currentUser.freq}
-                  </div>
-                </div>
-                <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                  <Clock size={16}/> Assigned Windows: {userWindows.map((w,i) => <span key={i} className="bg-white/50 px-1 rounded">{w.start}-{w.end}</span>)}
-                </div>
-              </div>
-
-              {displayedZones.length === 0 ? (
-                 <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 font-medium">You currently have no zones assigned to you.</div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {displayedZones.map((zone, i) => (
-                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-full">
-                      <h3 className="font-bold mb-6 text-slate-800 leading-snug">{zone}</h3>
-                      {isTimeValid ? (
-                        <button onClick={() => { setSelectedZone(zone); setActiveTab('inspection-form'); }} className="bg-slate-900 text-white w-full py-3 rounded-xl text-sm font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
-                          <ClipboardList size={18}/> Start Inspection
-                        </button>
-                      ) : (
-                        <button disabled className="bg-slate-100 text-slate-400 border border-slate-200 w-full py-3 rounded-xl text-sm font-bold cursor-not-allowed flex items-center justify-center gap-2">
-                          <Clock size={18}/> Outside Time Window
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'inspection-form' && (
-            <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto relative">
-              {!isTimeValid && (
-                 <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold flex items-center gap-2 shadow-sm">
-                    <Clock size={20}/> Time window has expired. This inspection is now locked and cannot be submitted.
-                 </div>
-              )}
-              <div className="border-b border-slate-200 pb-4 mb-6">
-                 <h2 className="text-2xl font-black text-slate-900">Conduct Inspection</h2>
-                 <p className="text-sm font-bold text-orange-600 mt-1 flex items-center gap-1"><ClipboardList size={16}/> {selectedZone}</p>
-              </div>
-              
-              <form onSubmit={handleInspectionSubmit} className="space-y-6">
-                {params.map((p, idx) => (
-                  <div key={p.id} className="p-4 sm:p-5 bg-slate-50 rounded-xl border border-slate-200">
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                       <div className="font-black text-slate-400 text-xl w-6">{idx + 1}.</div>
-                       <label className="font-medium text-slate-700 text-sm flex-1">{p.name}</label>
-                       <div className="flex w-full sm:w-auto gap-2 items-center">
-                         <select name={`res-${p.id}`} disabled={!isTimeValid} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400" defaultValue="" required>
-                            <option value="" disabled>Select Status...</option>
-                            <option value="Pass">🟢 Pass</option>
-                            <option value="Fail">🔴 Fail</option>
-                            <option value="NA">⚪ N/A</option>
-                         </select>
-                         
-                         <label 
-                            className={`flex items-center justify-center p-2 border rounded-lg transition-colors ${!isTimeValid ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed' : photoPreview[p.id] ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-inner cursor-pointer' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-orange-600 cursor-pointer'}`} 
-                            title={photoPreview[p.id] ? "Photo Attached!" : "Attach Photo"}
-                         >
-                            {photoPreview[p.id] ? <Check size={20}/> : <Camera size={20}/>}
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              capture="environment" 
-                              className="hidden" 
-                              disabled={!isTimeValid}
-                              onChange={(e) => {
-                                const file = e.target.files[0];
-                                if (file) {
-                                  setPhotoPreview(prev => ({...prev, [p.id]: true}));
-                                  setAttachedPhotos(prev => ({...prev, [p.id]: file.name})); // Store mock reference
-                                }
-                              }}
-                            />
-                         </label>
-                       </div>
-                    </div>
-                  </div>
-                ))}
-                
-                <div className="p-4 md:p-5 bg-orange-50 rounded-xl border border-orange-200 mt-8">
-                   <label className="font-black text-orange-900 block mb-2 text-base md:text-lg">Overall Remarks / Corrective Actions</label>
-                   <p className="text-xs text-orange-700 mb-3 font-medium">Add general observations or details regarding failed parameters.</p>
-                   <textarea 
-                      name="remarks"
-                      disabled={!isTimeValid}
-                      className="w-full p-3 md:p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white disabled:bg-slate-100 disabled:text-slate-400" 
-                      rows="4" 
-                      placeholder="Type your remarks here..."
-                   ></textarea>
-                </div>
-
-                <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4">
-                   <button type="button" onClick={() => { setActiveTab('dashboard'); setPhotoPreview({}); setAttachedPhotos({}); setIsSubmitting(false); }} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
-                   <button 
-                      type="submit" 
-                      disabled={isSubmitting || !isTimeValid} 
-                      className={`w-full sm:w-2/3 py-3 rounded-xl font-black text-base md:text-lg shadow-lg transition-all ${
-                        !isTimeValid ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
-                        : isSubmitting ? 'bg-orange-400 text-orange-100 cursor-not-allowed' 
-                        : 'bg-orange-600 text-white hover:bg-orange-700 shadow-orange-600/30'
-                      }`}
-                   >
-                     {!isTimeValid ? 'Locked: Time Expired' : isSubmitting ? '⏳ Processing...' : 'Submit Final Inspection'}
-                   </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {activeTab === 'report-accident' && (
-            <div className="bg-white p-6 md:p-10 rounded-2xl shadow-sm border border-red-200 max-w-3xl mx-auto">
-              <div className="border-b border-slate-200 pb-6 mb-6">
-                 <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Report an Accident / Incident</h2>
-                 <p className="text-sm font-medium text-slate-500 mt-1">Please fill out the details immediately following an incident.</p>
-              </div>
-              <form onSubmit={handleAccidentSubmit} className="space-y-6">
-                 <div>
-                   <label className="block font-bold text-slate-700 mb-2">1. Date & Time of Accident</label>
-                   <input type="datetime-local" name="accDate" className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none" required/>
-                 </div>
-                 <div>
-                   <label className="block font-bold text-slate-700 mb-2">2. Injured Person Involved</label>
-                   <p className="text-xs text-slate-500 mb-2">Please include name, role, and days of MC (Medical Certificate) if applicable. Type &quot;None&quot; if no injuries.</p>
-                   <input type="text" name="accInjured" placeholder="E.g. Ali bin Abu (Technician) - 3 Days MC" className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none" required/>
-                 </div>
-                 <div>
-                   <label className="block font-bold text-slate-700 mb-2">3. Property or Equipment Damage</label>
-                   <input type="text" name="accDamage" placeholder="E.g. Forklift bent, shelving unit collapsed..." className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none" required/>
-                 </div>
-                 <div>
-                   <label className="block font-bold text-slate-700 mb-2">4. Full Accident Details</label>
-                   <textarea name="accDetails" rows="5" placeholder="Describe exactly how the incident occurred..." className="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none" required></textarea>
-                 </div>
-                 <div className="pt-4 flex gap-4">
-                    <button type="button" onClick={() => setActiveTab('dashboard')} className="w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300">Cancel</button>
-                    <button type="submit" className="w-2/3 bg-red-600 text-white py-3 rounded-xl font-black text-lg hover:bg-red-700 shadow-lg shadow-red-600/30">Submit Accident Report</button>
-                 </div>
-              </form>
-            </div>
-          )}
-
-          {activeTab === 'admin-analytics' && (
-            <div className="max-w-7xl mx-auto space-y-8 pb-10">
-              <h2 className="text-2xl font-black text-slate-900">Analytics & Performance</h2>
-              
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {/* Monthly Inspections */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                  <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
-                    <BarChart3 className="text-orange-600"/> Monthly Inspections Conducted
-                  </h3>
-                  <div className="flex-1 flex items-end justify-between gap-2 h-64 mt-4 pt-4 border-t border-slate-100 relative">
-                    <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs font-bold text-slate-400">
-                      <span>{maxMonthlyScale}</span>
-                      <span>{Math.round(maxMonthlyScale / 2)}</span>
-                      <span>0</span>
-                    </div>
-                    <div className="pl-8 flex w-full justify-between items-end h-full">
-                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, idx) => {
-                        const count = allMonthlyCounts[idx];
-                        const heightPct = count > 0 ? (count / maxMonthlyScale) * 100 : 0;
-                        const isActiveMonth = idx === new Date().getMonth();
-                        return (
-                          <div key={month} className="flex flex-col items-center gap-2 group flex-1">
-                            <div className="w-full relative flex justify-center items-end h-48 bg-slate-50 rounded-t-md">
-                              <div className={`w-full max-w-[40px] rounded-t-md transition-all duration-500 ${isActiveMonth ? 'bg-orange-500' : 'bg-slate-300'}`} style={{ height: `${heightPct}%` }}>
-                                {count > 0 && <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-black text-slate-700">{count}</span>}
-                              </div>
-                            </div>
-                            <span className={`text-xs font-bold ${isActiveMonth ? 'text-orange-600' : 'text-slate-500'}`}>{month}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Monthly Compliance Avg */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                  <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
-                    <BarChart3 className="text-orange-600"/> Monthly Zone Compliance (Avg %)
-                  </h3>
-                  <div className="flex-1 flex items-end justify-between gap-2 h-64 mt-4 pt-4 border-t border-slate-100 relative">
-                    <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs font-bold text-slate-400">
-                      <span>100%</span>
-                      <span>50%</span>
-                      <span>0%</span>
-                    </div>
-                    <div className="pl-10 flex w-full justify-between items-end h-full">
-                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, idx) => {
-                         const monthInspections = inspections.filter(i => new Date(i.date).getMonth() === idx);
-                         let pass = 0; let total = 0;
-                         monthInspections.forEach(insp => {
-                           Object.values(insp.results || {}).forEach(val => {
-                             if (val === "Memuaskan" || val === "Pass") { pass++; total++; }
-                             if (val === "Tidak Memuaskan" || val === "Fail") { total++; }
-                           });
-                         });
-                         const compliance = total > 0 ? Math.round((pass / total) * 100) : 0;
-                         const colorClass = compliance >= 80 ? 'bg-emerald-500' : compliance >= 50 ? 'bg-amber-400' : compliance > 0 ? 'bg-red-500' : 'bg-slate-200';
-                         const isActiveMonth = idx === new Date().getMonth();
-                         return (
-                           <div key={month} className="flex flex-col items-center gap-2 group flex-1">
-                             <div className="w-full relative flex justify-center items-end h-48 bg-slate-50 rounded-t-md">
-                               <div className={`w-full max-w-[40px] rounded-t-md transition-all duration-500 ${compliance > 0 ? colorClass : 'bg-transparent'} ${isActiveMonth && compliance===0 ? 'border-b-4 border-orange-500' : ''}`} style={{ height: `${compliance}%` }}>
-                                 {compliance > 0 && <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-black text-slate-700">{compliance}%</span>}
-                               </div>
-                             </div>
-                             <span className={`text-xs font-bold ${isActiveMonth ? 'text-orange-600' : 'text-slate-500'}`}>{month}</span>
-                           </div>
-                         );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Overall Compliance by Zone */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
-                  <BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {initialZones.map((zone, idx) => {
-                    const score = zonePerformanceData[idx];
-                    const hasData = inspections.some(i => i.zone === zone);
-                    const color = score >= 80 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : score >= 50 ? 'text-amber-600 bg-amber-50 border-amber-200' : hasData ? 'text-red-600 bg-red-50 border-red-200' : 'text-slate-500 bg-slate-50 border-slate-200';
-                    return (
-                      <div key={idx} className={`p-4 rounded-xl border flex flex-col justify-between h-full ${color}`}>
-                        <h4 className="font-bold text-sm mb-4 leading-snug">{zone}</h4>
-                        <div className="flex items-end justify-between">
-                          <span className="text-3xl font-black">{hasData ? `${score}%` : 'N/A'}</span>
-                          <span className="text-xs font-bold uppercase opacity-70">Compliance</span>
-                        </div>
-                        <div className="w-full bg-white/50 rounded-full h-2 mt-3 overflow-hidden">
-                          <div className="bg-current h-full rounded-full transition-all duration-700" style={{ width: `${hasData ? score : 0}%` }}></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Personnel Daily Progress */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><Users className="text-orange-600"/> Personnel Daily Progress</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
-                      <tr><th className="p-4 rounded-tl-xl">Inspector</th><th className="p-4">Assigned Zones</th><th className="p-4">Target Freq.</th><th className="p-4">Today&apos;s Progress</th><th className="p-4 rounded-tr-xl">Status</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {personnel.filter(p => p.role === 'Inspector').map(p => {
-                        const isOffDay = checkIsOffDay(p);
-                        return (
-                        <tr key={p.id} className="hover:bg-slate-50/50">
-                          <td className="p-4 font-bold text-slate-800">{p.name}</td>
-                          <td className="p-4 text-slate-600"><div className="flex flex-wrap gap-1">{p.zones.map(z => <span key={z} className="bg-slate-100 px-2 py-1 rounded text-xs">{z.split('–')[0]}</span>)}</div></td>
-                          <td className="p-4 font-medium">{p.freq}</td>
-                          <td className="p-4">
-                            {isOffDay ? (
-                               <span className="text-xs font-bold text-slate-400 italic">No target (Off Day)</span>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px]"><div className="bg-orange-500 h-2.5 rounded-full" style={{width: '0%'}}></div></div>
-                                <span className="text-xs font-bold text-slate-500">0/{p.freq.charAt(0) || 1}</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-4">
-                             {isOffDay ? (
-                                <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg">Excused</span>
-                             ) : (
-                                <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg">Pending</span>
-                             )}
-                          </td>
-                        </tr>
-                      )})}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Accident Records Table */}
-              <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Accident / Incident Records</h3>
-                  <button className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors"><Download size={16}/> Export Excel</button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-red-50 text-red-700 uppercase text-xs font-black">
-                      <tr><th className="p-4 rounded-tl-xl">Date Reported</th><th className="p-4">Reported By</th><th className="p-4">Injured / MC</th><th className="p-4">Damage</th><th className="p-4 rounded-tr-xl">Details</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {accidents.length === 0 ? (
-                        <tr><td colSpan="5" className="p-8 text-center text-slate-400 font-medium">No accidents reported.</td></tr>
-                      ) : (
-                        accidents.map(acc => (
-                          <tr key={acc.id} className="hover:bg-red-50/30">
-                            <td className="p-4 font-bold text-slate-800">{new Date(acc.date).toLocaleString()}</td>
-                            <td className="p-4 text-slate-600 font-medium">{acc.reportedBy}</td>
-                            <td className="p-4 text-red-600 font-bold">{acc.injured}</td>
-                            <td className="p-4 text-slate-600">{acc.damage}</td>
-                            <td className="p-4 text-slate-600 max-w-xs truncate" title={acc.details}>{acc.details}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {activeTab === 'admin-settings' && (
-            <div className="max-w-7xl mx-auto space-y-8 pb-10">
-              <h2 className="text-2xl font-black text-slate-900">System Settings</h2>
-              
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-slate-800"><Users className="text-orange-600"/> Personnel Management</h3>
-                
-                {/* Add New User Form */}
-                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8">
-                  <h4 className="font-bold text-sm mb-4 text-slate-700 uppercase">Register New Personnel</h4>
-                  <form onSubmit={addPersonnel} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div><label className="block text-xs font-bold text-slate-500 mb-1">Full Name</label><input name="name" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required /></div>
-                      <div><label className="block text-xs font-bold text-slate-500 mb-1">Role</label><select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"><option>Inspector</option><option>Admin</option></select></div>
-                      <div><label className="block text-xs font-bold text-slate-500 mb-1">Daily Frequency</label><input name="freq" placeholder="E.g. 2 times/day" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required /></div>
-                      <div><label className="block text-xs font-bold text-slate-500 mb-1">Initial Password</label><input name="password" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required /></div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Time Windows Config */}
-                      <div className="bg-white p-4 rounded-lg border border-slate-200">
-                        <div className="flex justify-between items-center mb-2">
-                           <label className="block text-xs font-bold text-slate-500">Inspection Time Windows</label>
-                           <button type="button" onClick={() => setNewUserWindows([...newUserWindows, {start:"08:00", end:"17:00"}])} className="text-xs font-bold text-orange-600 flex items-center gap-1"><Plus size={14}/> Add Window</button>
-                        </div>
-                        <div className="space-y-2">
-                           {newUserWindows.map((w, i) => (
-                             <div key={i} className="flex items-center gap-2">
-                                <input type="time" value={w.start} onChange={(e) => { const newW = [...newUserWindows]; newW[i].start = e.target.value; setNewUserWindows(newW); }} className="p-2 border rounded text-sm flex-1"/>
-                                <span className="text-slate-400 font-bold">to</span>
-                                <input type="time" value={w.end} onChange={(e) => { const newW = [...newUserWindows]; newW[i].end = e.target.value; setNewUserWindows(newW); }} className="p-2 border rounded text-sm flex-1"/>
-                                {newUserWindows.length > 1 && <button type="button" onClick={() => setNewUserWindows(newUserWindows.filter((_, idx) => idx !== i))} className="text-red-500 p-1"><X size={16}/></button>}
-                             </div>
-                           ))}
-                        </div>
-                      </div>
-
-                      {/* Off Days Config */}
-                      <div className="bg-white p-4 rounded-lg border border-slate-200">
-                        <label className="block text-xs font-bold text-slate-500 mb-2">Select Off Days</label>
-                        <div className="flex flex-wrap gap-2">
-                          {daysOfWeek.map(day => (
-                            <label key={day} className={`px-3 py-1.5 rounded-lg text-xs font-bold border cursor-pointer transition-colors ${newUserOffDays.includes(day) ? 'bg-red-50 border-red-200 text-red-600' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}`}>
-                              <input type="checkbox" className="hidden" checked={newUserOffDays.includes(day)} onChange={(e) => {
-                                if(e.target.checked) setNewUserOffDays([...newUserOffDays, day]);
-                                else setNewUserOffDays(newUserOffDays.filter(d => d !== day));
-                              }}/>
-                              {day.slice(0,3)}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-2">Assign Zones</label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200">
-                         {initialZones.map((z, idx) => (
-                           <label key={idx} className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
-                             <input type="checkbox" name="zone" value={z} className="mt-1 text-orange-600 focus:ring-orange-500 rounded" />
-                             <span className="leading-tight">{z}</span>
-                           </label>
-                         ))}
-                      </div>
-                    </div>
-                    <button type="submit" className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex items-center gap-2"><UserPlus size={16}/> Add Personnel</button>
-                  </form>
-                </div>
-
-                {/* Personnel Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
-                      <tr><th className="p-4 rounded-tl-xl">Name</th><th className="p-4">Role</th><th className="p-4">Time Windows & Off Days</th><th className="p-4">Zones</th><th className="p-4 rounded-tr-xl text-right">Actions</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {personnel.map(p => (
-                      <React.Fragment key={p.id}>
-                        <tr className="hover:bg-slate-50/50">
-                          <td className="p-4 font-bold text-slate-800">{p.name}</td>
-                          <td className="p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role === 'Admin' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
-                          <td className="p-4">
-                             <div className="flex flex-col gap-1 text-xs">
-                               <div className="text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded inline-block w-max">
-                                  {p.timeWindows?.map(w => `${w.start}-${w.end}`).join(', ') || 'N/A'}
-                               </div>
-                               <div className="text-red-600 font-bold">
-                                  Off: {p.offDays?.length > 0 ? p.offDays.map(d=>d.slice(0,3)).join(', ') : 'None'}
-                               </div>
-                             </div>
-                          </td>
-                          <td className="p-4 text-xs text-slate-600 max-w-xs truncate">{p.zones.join(', ')}</td>
-                          <td className="p-4 text-right">
-                             <div className="flex justify-end gap-2">
-                               <button onClick={() => { setEditingUserId(p.id); setEditUserForm(JSON.parse(JSON.stringify(p))); }} title="Edit Schedule" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={16}/></button>
-                               <button onClick={() => resetPassword(p.id)} title="Reset Password" className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Key size={16}/></button>
-                               <button onClick={() => setPersonnel(personnel.filter(u => u.id !== p.id))} title="Delete User" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
-                             </div>
-                          </td>
-                        </tr>
-                        {/* Inline Edit Row */}
-                        {editingUserId === p.id && (
-                          <tr className="bg-blue-50/50 border-b border-blue-100">
-                             <td colSpan="5" className="p-4">
-                                <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
-                                  <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2"><Edit2 size={16}/> Editing Schedule: {p.name}</h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                                     {/* Edit Windows */}
-                                     <div>
-                                        <div className="flex justify-between mb-2"><label className="text-xs font-bold text-slate-600">Time Windows</label><button onClick={() => setEditUserForm({...editUserForm, timeWindows: [...editUserForm.timeWindows, {start:"08:00", end:"17:00"}]})} className="text-xs text-blue-600 font-bold">+ Add</button></div>
-                                        <div className="space-y-2">
-                                          {editUserForm.timeWindows.map((w, idx) => (
-                                            <div key={idx} className="flex gap-2">
-                                               <input type="time" value={w.start} onChange={(e) => { const nw = [...editUserForm.timeWindows]; nw[idx].start = e.target.value; setEditUserForm({...editUserForm, timeWindows: nw})}} className="border p-1 text-sm rounded flex-1"/>
-                                               <input type="time" value={w.end} onChange={(e) => { const nw = [...editUserForm.timeWindows]; nw[idx].end = e.target.value; setEditUserForm({...editUserForm, timeWindows: nw})}} className="border p-1 text-sm rounded flex-1"/>
-                                               {editUserForm.timeWindows.length > 1 && <button onClick={() => setEditUserForm({...editUserForm, timeWindows: editUserForm.timeWindows.filter((_,i)=>i!==idx)})} className="text-red-500 px-2"><X size={14}/></button>}
-                                            </div>
-                                          ))}
-                                        </div>
-                                     </div>
-                                     {/* Edit Off Days */}
-                                     <div>
-                                        <label className="text-xs font-bold text-slate-600 mb-2 block">Off Days</label>
-                                        <div className="flex flex-wrap gap-1">
-                                          {daysOfWeek.map(day => (
-                                            <label key={day} className={`px-2 py-1 rounded text-xs font-bold border cursor-pointer ${editUserForm.offDays.includes(day) ? 'bg-red-100 text-red-700 border-red-200' : 'bg-slate-50 text-slate-500'}`}>
-                                              <input type="checkbox" className="hidden" checked={editUserForm.offDays.includes(day)} onChange={(e) => {
-                                                const noff = e.target.checked ? [...editUserForm.offDays, day] : editUserForm.offDays.filter(d=>d!==day);
-                                                setEditUserForm({...editUserForm, offDays: noff});
-                                              }}/>
-                                              {day.slice(0,3)}
-                                            </label>
-                                          ))}
-                                        </div>
-                                     </div>
-                                  </div>
-                                  <div className="flex justify-end gap-2">
-                                     <button onClick={() => setEditingUserId(null)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold text-sm rounded-lg">Cancel</button>
-                                     <button onClick={saveEditedUser} className="px-4 py-2 bg-blue-600 text-white font-bold text-sm rounded-lg flex items-center gap-1"><Save size={16}/> Save Changes</button>
-                                  </div>
-                                </div>
-                             </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Footer inside main layout area */}
-          <div className="text-center p-4 text-xs text-slate-400 font-medium border-t border-slate-200 mt-auto">
-            © 2026 KLSMHSE • Developed by ThadYap
+          <div className="absolute bottom-6 text-center text-xs text-slate-500 font-medium">
+             &copy; 2026 KLSMHSE <span className="mx-2 hidden md:inline">•</span><br className="md:hidden" /> Developed by ThadYap
           </div>
         </div>
-      </main>
+      ) : (
+        <>
+          {/* Sidebar Navigation */}
+          <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
+            <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
+              <ShieldAlert size={24} className="text-orange-500"/> 
+              <h1 className="text-lg md:text-xl font-black text-orange-500 tracking-tight hidden md:block">KLSM Hub</h1>
+            </div>
+            
+            <nav className="flex flex-row md:flex-col space-y-0 md:space-y-2 space-x-2 md:space-x-0 flex-1 overflow-x-auto no-scrollbar items-center md:items-stretch">
+              <button onClick={() => setActiveTab('dashboard')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                <LayoutDashboard size={20}/> <span className="text-sm md:text-base">Dashboard</span>
+              </button>
+
+              <button onClick={() => setActiveTab('accident-report')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'accident-report' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                <AlertTriangle size={20}/> <span className="text-sm md:text-base">Report Accident</span>
+              </button>
+              
+              {currentUser?.role.includes('Admin') && (
+                <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                  <BarChart3 size={20}/> <span className="text-sm md:text-base">Analytics</span>
+                </button>
+              )}
+
+              {currentUser?.role === 'Level 1 Admin' && (
+                <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                  <Settings size={20}/> <span className="text-sm md:text-base">Settings</span>
+                </button>
+              )}
+            </nav>
+
+            <div className="hidden md:block pt-4 border-t border-slate-800 mt-auto mb-4">
+               <p className="text-xs text-slate-400 font-semibold mb-1">Logged in as:</p>
+               <p className="text-sm font-bold text-white">{currentUser.name}</p>
+            </div>
+            <button onClick={() => {setCurrentUser(null); setActiveTab('login');}} className="flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 ml-2 md:ml-0 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl font-bold transition-colors shrink-0">
+              <LogOut size={20}/> <span className="hidden md:inline">Sign Out</span>
+            </button>
+          </aside>
+
+          {/* Main Content Area */}
+          <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
+            <div className="flex-1 p-4 md:p-8 print:p-0">
+              
+              {/* Dashboard Tab */}
+              {activeTab === 'dashboard' && (
+                <div className="max-w-7xl mx-auto">
+                  <h2 className="text-xl md:text-2xl font-black mb-6 text-slate-900">Your Assigned Zones</h2>
+                  {displayedZones.length === 0 ? (
+                     <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500">You currently have no zones assigned to you.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                      {displayedZones.map((zone, i) => (
+                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-full">
+                          <h3 className="font-bold mb-6 text-slate-800 leading-snug text-sm md:text-base">{zone}</h3>
+                          <button onClick={() => { setSelectedZone(zone); setActiveTab('inspection-form'); }} className="bg-slate-900 text-white w-full py-3 rounded-xl text-sm font-bold hover:bg-orange-600 transition-colors flex items-center justify-center gap-2">
+                            <ClipboardList size={18}/> Start Inspection
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Accident Reporting Form */}
+              {activeTab === 'accident-report' && (
+                <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto border-t-4 border-t-red-600">
+                  <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6">
+                     <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Report an Accident / Incident</h2>
+                     <p className="text-xs md:text-sm font-medium text-slate-500 mt-1">Please fill out the following details as accurately as possible.</p>
+                  </div>
+                  
+                  <form onSubmit={handleAccidentSubmit} className="space-y-6">
+                    <div className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
+                      <label className="font-bold text-slate-800 block mb-2 text-sm md:text-base">1. Date & Time of Accident</label>
+                      <input type="datetime-local" name="accidentDate" className="w-full p-3 border border-slate-300 rounded-lg font-medium text-slate-700 focus:ring-2 focus:ring-red-500 outline-none bg-white" required />
+                    </div>
+
+                    <div className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
+                      <label className="font-bold text-slate-800 block mb-2 text-sm md:text-base">2. Injured Person Involved (if any)</label>
+                      <p className="text-xs text-slate-500 mb-3">Please include name and days of MC if applicable.</p>
+                      <input type="text" name="injuredPerson" placeholder="E.g. Ali Bin Abu - 3 Days MC" className="w-full p-3 border border-slate-300 rounded-lg font-medium text-slate-700 focus:ring-2 focus:ring-red-500 outline-none bg-white" />
+                    </div>
+
+                    <div className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200">
+                      <label className="font-bold text-slate-800 block mb-2 text-sm md:text-base">3. Property or Equipment Damage (if any)</label>
+                      <input type="text" name="damage" placeholder="E.g. Forklift front bumper dented" className="w-full p-3 border border-slate-300 rounded-lg font-medium text-slate-700 focus:ring-2 focus:ring-red-500 outline-none bg-white" />
+                    </div>
+
+                    <div className="p-4 md:p-5 bg-red-50 rounded-xl border border-red-200 mt-8">
+                       <label className="font-black text-red-900 block mb-2 text-base md:text-lg">4. Accident Details</label>
+                       <p className="text-xs text-red-700 mb-3 font-medium">Provide a full description of how the accident occurred.</p>
+                       <textarea 
+                          name="details"
+                          className="w-full p-3 md:p-4 border border-red-300 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm bg-white" 
+                          rows="5" 
+                          placeholder="Describe the incident in detail..."
+                          required
+                       ></textarea>
+                    </div>
+
+                    <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4">
+                       <button type="button" onClick={() => setActiveTab('dashboard')} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
+                       <button type="submit" className="w-full sm:w-2/3 bg-red-600 text-white py-3 rounded-xl font-black text-base md:text-lg hover:bg-red-700 shadow-lg shadow-red-600/30 transition-all">Submit Accident Report</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Admin Analytics Panel */}
+              {activeTab === 'admin-analytics' && (
+                <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+                     <h2 className="text-xl md:text-2xl font-black text-slate-900">Analytics & History</h2>
+                     <div className="flex flex-wrap gap-2">
+                       <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                          <FileSpreadsheet size={16}/> Export Inspections
+                       </button>
+                       <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                          <FileText size={16}/> Save Dashboard PDF
+                       </button>
+                     </div>
+                  </div>
+                  
+                  <div className="bg-white p-4 md:p-6 rounded-2xl border border-red-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                      <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600 print:text-black"/> Accident & Incident Records</h3>
+                      <button onClick={exportAccidentsToExcel} className="flex items-center gap-2 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors print:hidden">
+                          <FileSpreadsheet size={14}/> Export Accidents
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                      <table className="w-full text-sm text-left min-w-[800px]">
+                        <thead className="bg-red-50 text-red-800 uppercase text-xs font-black print:bg-white print:text-black">
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Date of Accident</th><th className="p-3 md:p-4">Reported By</th><th className="p-3 md:p-4">Injured Person & MC</th><th className="p-3 md:p-4">Property Damage</th><th className="p-3 md:p-4 rounded-tr-xl">Details</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 print:divide-slate-300">
+                          {accidents.sort((a,b) => new Date(b.reportedAt) - new Date(a.reportedAt)).map(acc => (
+                            <tr key={acc.id} className="hover:bg-slate-50/50">
+                              <td className="p-3 md:p-4 font-bold text-slate-800 whitespace-nowrap">{new Date(acc.accidentDate).toLocaleString()}</td>
+                              <td className="p-3 md:p-4 font-medium text-slate-600 whitespace-nowrap">{acc.reportedBy}</td>
+                              <td className="p-3 md:p-4">{acc.injuredPerson}</td>
+                              <td className="p-3 md:p-4 text-slate-600">{acc.damage}</td>
+                              <td className="p-3 md:p-4 text-xs text-slate-500 max-w-xs truncate" title={acc.details}>{acc.details}</td>
+                            </tr>
+                          ))}
+                          {accidents.length === 0 && <tr><td colSpan="5" className="p-4 text-center text-slate-500 italic font-medium">No accidents reported.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
+                    <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
+                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                      <table className="w-full text-sm text-left min-w-[600px]">
+                        <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black print:bg-white print:text-black">
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Inspector</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Completed Today</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 print:divide-slate-300">
+                          {personnel.filter(p => p.role === 'Inspector').map(p => {
+                            const target = parseInt(p.freq) || 0;
+                            const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                            const isOffDay = p.offDays && p.offDays.includes(todayName);
+                            const actualTarget = isOffDay ? 0 : target;
+                            const today = new Date().toLocaleDateString();
+                            const completedToday = inspections.filter(i => i.inspectorName === p.name && new Date(i.date).toLocaleDateString() === today).length;
+                            const percentage = actualTarget > 0 ? Math.min((completedToday / actualTarget) * 100, 100) : 100;
+
+                            return (
+                              <tr key={p.id} className="hover:bg-slate-50/50">
+                                <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
+                                <td className="p-3 md:p-4 font-medium">{isOffDay ? <span className="text-slate-400 italic">Off Day</span> : `${p.freq} times`}</td>
+                                <td className="p-3 md:p-4">
+                                  {isOffDay ? (
+                                    <span className="text-slate-400 italic text-sm font-medium">No inspection required</span>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
+                                        <div className="bg-orange-500 h-2.5 rounded-full" style={{width: `${percentage}%`}}></div>
+                                      </div>
+                                      <span className="text-xs font-bold text-slate-500 print:text-black">{completedToday}/{target}</span>
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-3 md:p-4">
+                                  {isOffDay ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg print:border print:border-black">Off Day</span> : (percentage >= 100 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg print:border print:border-black">Complete</span> : <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg print:border print:border-black">In Progress</span>)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
+                    <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600 print:text-black"/> Zone Compliance Performance</h3>
+                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                      <table className="w-full text-sm text-left min-w-[600px]">
+                        <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black print:bg-white print:text-black">
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Zone</th><th className="p-3 md:p-4">Last Inspected</th><th className="p-3 md:p-4">Issues Found</th><th className="p-3 md:p-4">Compliance Rate</th><th className="p-3 md:p-4">Status</th><th className="p-3 md:p-4 rounded-tr-xl print:hidden">Action</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 print:divide-slate-300">
+                          {initialZones.map((zone, idx) => {
+                            const zoneInspections = inspections.filter(i => i.zone === zone).sort((a, b) => new Date(b.date) - new Date(a.date));
+                            const latest = zoneInspections[0];
+                            
+                            let compliance = 0; let issues = 0; let status = "N/A"; let lastInspected = "Never";
+
+                            if (latest) {
+                              lastInspected = new Date(latest.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+                              let memuaskan = 0; let totalScored = 0;
+                              
+                              Object.values(latest.results || {}).forEach(val => {
+                                if (val === "Memuaskan") { memuaskan++; totalScored++; }
+                                if (val === "Tidak Memuaskan") { issues++; totalScored++; }
+                              });
+                              
+                              compliance = totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 100;
+                              status = compliance >= 90 ? 'Good' : (compliance >= 70 ? 'Warning' : 'Critical');
+                            }
+
+                            const statusColors = { 'Good': 'bg-emerald-100 text-emerald-700', 'Warning': 'bg-amber-100 text-amber-700', 'Critical': 'bg-red-100 text-red-700', 'N/A': 'bg-slate-100 text-slate-700' };
+                            
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/50">
+                                <td className="p-3 md:p-4 font-bold text-slate-800 max-w-[200px] truncate print:whitespace-normal" title={zone}>{zone}</td>
+                                <td className="p-3 md:p-4 text-slate-600 print:text-black">{lastInspected}</td>
+                                <td className="p-3 md:p-4 font-medium">{issues > 0 ? <span className="text-red-600">{issues}</span> : <span className="text-slate-400">0</span>}</td>
+                                <td className="p-3 md:p-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
+                                      <div className={`h-2.5 rounded-full ${compliance >= 90 ? 'bg-emerald-500' : (compliance >= 70 ? 'bg-amber-500' : (status === 'N/A' ? 'bg-transparent' : 'bg-red-500'))}`} style={{width: `${status === 'N/A' ? 0 : compliance}%`}}></div>
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-500 print:text-black">{status === 'N/A' ? '-' : `${compliance}%`}</span>
+                                  </div>
+                                </td>
+                                <td className="p-3 md:p-4"><span className={`px-2 py-1 text-xs font-bold rounded-lg print:border print:border-black ${statusColors[status]}`}>{status}</span></td>
+                                <td className="p-3 md:p-4 print:hidden">
+                                  <button onClick={() => { setSelectedReport(latest); setActiveTab('view-report'); }} disabled={!latest} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${latest ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Eye size={14}/> View</button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
+                    <h3 className="font-bold text-base md:text-lg mb-2 text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Inspection Records</h3>
+                    <p className="text-xs text-slate-500 mb-4 font-medium">Access all previously submitted inspection forms here.</p>
+                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                      <table className="w-full text-sm text-left min-w-[600px]">
+                        <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Date & Time</th><th className="p-3 md:p-4">Zone</th><th className="p-3 md:p-4">Inspector</th><th className="p-3 md:p-4 rounded-tr-xl">Action</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {inspections.sort((a,b) => new Date(b.date) - new Date(a.date)).map(insp => (
+                            <tr key={insp.id} className="hover:bg-slate-50/50">
+                              <td className="p-3 md:p-4 font-medium text-slate-700">{new Date(insp.date).toLocaleString()}</td>
+                              <td className="p-3 md:p-4 text-slate-800 font-bold max-w-[200px] truncate" title={insp.zone}>{insp.zone}</td>
+                              <td className="p-3 md:p-4 text-slate-600">{insp.inspectorName}</td>
+                              <td className="p-3 md:p-4">
+                                <button onClick={() => { setSelectedReport(insp); setActiveTab('view-report'); }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"><Eye size={14}/> View Report</button>
+                              </td>
+                            </tr>
+                          ))}
+                          {inspections.length === 0 && <tr><td colSpan="4" className="p-4 text-center text-slate-500 italic font-medium">No records found.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Render Saved Single Report View */}
+              {activeTab === 'view-report' && selectedReport && (
+                <div className="max-w-4xl mx-auto bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
+                  <div className="flex flex-col sm:flex-row justify-between items-start border-b border-slate-200 pb-6 mb-6 print:border-b-2 print:border-black">
+                    <div>
+                      <button onClick={() => setActiveTab('admin-analytics')} className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-orange-600 mb-4 print:hidden transition-colors"><ArrowLeft size={16}/> Back to Analytics</button>
+                      <h2 className="text-2xl font-black text-slate-900">Inspection Report</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 mt-4">
+                        <p className="text-sm"><span className="font-bold text-slate-500 print:text-black">Zone:</span> <span className="font-bold text-slate-800 print:text-black">{selectedReport.zone}</span></p>
+                        <p className="text-sm"><span className="font-bold text-slate-500 print:text-black">Inspector:</span> <span className="font-bold text-slate-800 print:text-black">{selectedReport.inspectorName}</span></p>
+                        <p className="text-sm"><span className="font-bold text-slate-500 print:text-black">Date:</span> <span className="font-bold text-slate-800 print:text-black">{new Date(selectedReport.date).toLocaleString()}</span></p>
+                      </div>
+                    </div>
+                    <button onClick={() => window.print()} className="mt-4 sm:mt-0 flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors print:hidden"><FileText size={16}/> Save PDF</button>
+                  </div>
+
+                  <div className="space-y-6">
+                    <table className="w-full text-sm text-left border border-slate-200 print:border-black">
+                      <thead className="bg-slate-50 print:bg-white print:border-b-2 print:border-black">
+                        <tr><th className="p-3 md:p-4 font-black text-slate-700 print:text-black">Checklist Item</th><th className="p-3 md:p-4 font-black text-slate-700 print:text-black w-48">Result</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 print:divide-black">
+                        {Object.entries(selectedReport.results || {}).map(([item, result], idx) => {
+                          let resColor = "text-slate-600";
+                          if (result === "Memuaskan") resColor = "text-emerald-600";
+                          if (result === "Tidak Memuaskan") resColor = "text-red-600";
+                          return (
+                            <tr key={idx} className="print:break-inside-avoid">
+                              <td className="p-3 md:p-4 text-slate-800 font-medium print:text-black">{item}</td>
+                              <td className={`p-3 md:p-4 font-bold ${resColor} print:text-black`}>{result}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div className="p-4 md:p-5 bg-slate-50 rounded-xl border border-slate-200 print:bg-white print:border print:border-black print:break-inside-avoid">
+                       <label className="font-black text-slate-900 block mb-2 text-base md:text-lg print:text-black">Remarks / Corrective Actions</label>
+                       <p className="text-sm text-slate-800 whitespace-pre-wrap print:text-black">{selectedReport.remarks}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Settings Tab */}
+              {activeTab === 'admin-settings' && currentUser?.role === 'Level 1 Admin' && (
+                <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
+                  <h2 className="text-xl md:text-2xl font-black text-slate-900">System Settings</h2>
+                  
+                  <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <h3 className="font-bold text-base md:text-lg mb-6 flex items-center gap-2 text-slate-800"><Users className="text-orange-600"/> Personnel Management</h3>
+                    
+                    <div className="bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-200 mb-8">
+                      <h4 className="font-bold text-sm mb-4 text-slate-700 uppercase">Register New Personnel</h4>
+                      <form onSubmit={addPersonnel} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                             <label className="block text-xs font-bold text-slate-500 mb-1">Full Name</label>
+                             <input name="name" placeholder="E.g. Ali bin Abu" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
+                          </div>
+                          <div>
+                             <label className="block text-xs font-bold text-slate-500 mb-1">Role</label>
+                             <select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                               <option>Inspector</option>
+                               <option>Level 1 Admin</option>
+                               <option>Level 2 Admin</option>
+                             </select>
+                          </div>
+                          <div>
+                             <label className="block text-xs font-bold text-slate-500 mb-1">Daily Frequency</label>
+                             <input name="freq" placeholder="E.g. 2" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
+                          </div>
+                          <div>
+                             <label className="block text-xs font-bold text-slate-500 mb-1">Initial Password</label>
+                             <input name="password" placeholder="Set password" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-2">Assign Zones (Ignored for Admins)</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200 h-48 overflow-y-auto">
+                             {initialZones.map((z, idx) => (
+                               <label key={idx} className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
+                                 <input type="checkbox" name="zone" value={z} className="mt-1 text-orange-600 focus:ring-orange-500 rounded" />
+                                 <span className="leading-tight">{z}</span>
+                               </label>
+                             ))}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-2">Select Off Days</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200">
+                             {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, idx) => (
+                               <label key={idx} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                 <input type="checkbox" name="offDays" value={day} className="text-orange-600 focus:ring-orange-500 rounded" />
+                                 <span className="leading-tight">{day}</span>
+                               </label>
+                             ))}
+                          </div>
+                        </div>
+                        
+                        <button type="submit" className="w-full md:w-auto bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex justify-center items-center gap-2"><UserPlus size={16}/> Add Personnel</button>
+                      </form>
+                    </div>
+
+                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                      <table className="w-full text-sm text-left min-w-[600px]">
+                        <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Name</th><th className="p-3 md:p-4">Role</th><th className="p-3 md:p-4">Assigned Zones</th><th className="p-3 md:p-4">Frequency</th><th className="p-3 md:p-4">Off Days</th><th className="p-3 md:p-4 rounded-tr-xl text-right">Actions</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {personnel.map(p => (
+                          <tr key={p.id} className="hover:bg-slate-50/50">
+                            <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
+                            <td className="p-3 md:p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role.includes('Admin') ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
+                            <td className="p-3 md:p-4 text-xs text-slate-600 max-w-[200px] truncate">{p.zones.join(', ')}</td>
+                            <td className="p-3 md:p-4 font-medium">{p.freq}</td>
+                            
+                            {/* Editable Off Days Cell */}
+                            <td className="p-3 md:p-4 text-xs text-slate-600 font-medium">
+                              {editingOffDaysId === p.id ? (
+                                 <div className="flex flex-col gap-2 min-w-[200px]">
+                                   <div className="flex flex-wrap gap-2 bg-white p-2 border border-slate-200 rounded-lg shadow-inner">
+                                     {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, idx) => (
+                                       <label key={idx} className="flex items-center gap-1 cursor-pointer">
+                                         <input 
+                                           type="checkbox" 
+                                           checked={tempOffDays.includes(day)}
+                                           onChange={(e) => {
+                                             if(e.target.checked) setTempOffDays([...tempOffDays, day]);
+                                             else setTempOffDays(tempOffDays.filter(d => d !== day));
+                                           }}
+                                           className="text-orange-600 focus:ring-orange-500 rounded" 
+                                         />
+                                         <span className="leading-tight">{day.substring(0,3)}</span>
+                                       </label>
+                                     ))}
+                                   </div>
+                                   <div className="flex gap-2">
+                                     <button onClick={() => saveOffDays(p.id)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700 transition-colors">Save</button>
+                                     <button onClick={() => setEditingOffDaysId(null)} className="bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-400 transition-colors">Cancel</button>
+                                   </div>
+                                 </div>
+                              ) : (
+                                 <div className="flex items-center gap-2">
+                                   <span className="flex-1">{(p.offDays || []).join(', ') || 'None'}</span>
+                                   <button onClick={() => { setEditingOffDaysId(p.id); setTempOffDays(p.offDays || []); }} title="Edit Off Days" className="p-1.5 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-md transition-colors"><Pencil size={14}/></button>
+                                 </div>
+                              )}
+                            </td>
+
+                            <td className="p-3 md:p-4 text-right">
+                               <div className="flex justify-end gap-2">
+                                 <button onClick={() => editPassword(p.id)} title="Edit Password" className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Key size={16}/></button>
+                                 <button onClick={() => deleteUser(p.id)} title="Delete User" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                               </div>
+                            </td>
+                          </tr>
+                        ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <h3 className="font-bold text-base md:text-lg mb-2 flex items-center gap-2 text-slate-800"><ClipboardList className="text-orange-600"/> Parameter Management</h3>
+                    <p className="text-sm text-slate-500 mb-6">These parameters build the dynamic inspection form.</p>
+                    
+                    <div className="space-y-4">
+                      {params.map(p => (
+                        <div key={p.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                           <div className="bg-slate-50 p-3 md:p-4 border-b border-slate-200 font-black text-slate-800 flex justify-between items-center text-sm md:text-base">
+                              {editingItem.id === p.id && editingItem.subId === null ? (
+                                 <div className="flex-1 flex items-center gap-2 mr-4">
+                                   <input
+                                     value={editingItem.text}
+                                     onChange={(e) => setEditingItem({...editingItem, text: e.target.value})}
+                                     className="w-full border border-orange-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none font-medium"
+                                     autoFocus
+                                   />
+                                   <button onClick={saveEdit} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-emerald-700">Save</button>
+                                   <button onClick={() => setEditingItem({ id: null, subId: null, text: '' })} className="bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-400">Cancel</button>
+                                 </div>
+                              ) : (
+                                 <>
+                                   <span className="flex-1">{p.name}</span>
+                                   <div className="flex items-center gap-3">
+                                      <span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{p.subParams.length} items</span>
+                                      <button onClick={() => setEditingItem({ id: p.id, subId: null, text: p.name })} className="text-slate-400 hover:text-orange-600" title="Edit Category"><Pencil size={16}/></button>
+                                      <button onClick={() => deleteMainParam(p.id)} className="text-slate-400 hover:text-red-600" title="Delete Category"><Trash2 size={16}/></button>
+                                   </div>
+                                 </>
+                              )}
+                           </div>
+                           <div className="p-3 md:p-4 bg-white">
+                              <ul className="space-y-2 mb-4">
+                                {p.subParams.length === 0 && <li className="text-sm text-slate-400 italic">No sub-parameters added yet. Inspectors will see a blank category.</li>}
+                                {p.subParams.map(sp => (
+                                   <li key={sp.id} className="flex justify-between items-center bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100 text-xs md:text-sm font-medium text-slate-700">
+                                     {editingItem.id === p.id && editingItem.subId === sp.id ? (
+                                        <div className="flex-1 flex items-center gap-2">
+                                          <input
+                                            value={editingItem.text}
+                                            onChange={(e) => setEditingItem({...editingItem, text: e.target.value})}
+                                            className="w-full border border-orange-300 p-1.5 rounded-md text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                                            autoFocus
+                                          />
+                                          <button onClick={saveEdit} className="bg-emerald-600 text-white px-2 py-1.5 rounded-md text-xs font-bold hover:bg-emerald-700">Save</button>
+                                          <button onClick={() => setEditingItem({ id: null, subId: null, text: '' })} className="bg-slate-300 text-slate-700 px-2 py-1.5 rounded-md text-xs font-bold hover:bg-slate-400">Cancel</button>
+                                        </div>
+                                     ) : (
+                                        <>
+                                          <span className="flex-1 pr-4">{sp.text}</span>
+                                          <div className="flex items-center gap-2">
+                                            <button onClick={() => setEditingItem({ id: p.id, subId: sp.id, text: sp.text })} title="Edit Sub-Parameter" className="text-slate-400 hover:text-orange-600 transition-colors"><Pencil size={16}/></button>
+                                            <button onClick={() => removeSubParam(p.id, sp.id)} title="Remove Sub-Parameter" className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                          </div>
+                                        </>
+                                     )}
+                                   </li>
+                                ))}
+                              </ul>
+                              <form onSubmit={(e) => addSubParam(e, p.id)} className="flex flex-col sm:flex-row gap-2 mt-4">
+                                 <input name="subParamText" placeholder="Add specific checklist item..." className="flex-1 border border-slate-300 p-2 md:p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-slate-50" required />
+                                 <button type="submit" className="w-full sm:w-auto bg-slate-200 text-slate-700 px-4 py-2 md:py-2.5 rounded-lg text-sm font-bold hover:bg-slate-300 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> Add Item</button>
+                              </form>
+                           </div>
+                        </div>
+                      ))}
+                      
+                      <form onSubmit={addMainParam} className="flex flex-col sm:flex-row gap-2 pt-6 border-t border-slate-100 mt-6">
+                         <input name="newMainParam" placeholder="Create a new Main Category..." className="flex-1 border border-orange-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-orange-500 outline-none" required />
+                         <button type="submit" className="w-full sm:w-auto bg-orange-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"><Plus size={16}/> New Category</button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Inspection Form */}
+              {activeTab === 'inspection-form' && (
+                <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
+                  <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6 flex justify-between items-start print:hidden">
+                     <div>
+                       <h2 className="text-xl md:text-2xl font-black text-slate-900">Conduct Inspection</h2>
+                       <p className="text-xs md:text-sm font-bold text-orange-600 mt-1 flex items-center gap-1"><ClipboardList size={16}/> {selectedZone}</p>
+                     </div>
+                     <button type="button" onClick={() => window.print()} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-bold transition-colors">
+                        <FileText size={16}/> Print Blank Form
+                     </button>
+                  </div>
+                  
+                  <form onSubmit={handleInspectionSubmit} className="space-y-6">
+                    {params.map(p => (
+                      <div key={p.id} className="mb-8">
+                        <h3 className="font-black text-slate-800 text-lg md:text-xl mb-4 pb-2 border-b-2 border-slate-100 print:text-black print:border-black">{p.name}</h3>
+                        
+                        <div className="space-y-3">
+                          {p.subParams.length === 0 ? (
+                             <p className="text-sm text-slate-400 italic print:text-black">No specific checklist items defined for this category.</p>
+                          ) : (
+                            p.subParams.map(sp => (
+                              <div key={sp.id} className="p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 md:gap-6 justify-between items-start sm:items-center print:border-black print:bg-white print:break-inside-avoid">
+                                 <label className="font-medium text-slate-700 text-sm flex-1 print:text-black">{sp.text}</label>
+                                 
+                                 <div className="flex w-full sm:w-auto gap-2 items-center print:hidden">
+                                   <select name={`res-[${p.name}] ${sp.text}`} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none" defaultValue="" required>
+                                      <option value="" disabled>Pilih Status...</option>
+                                      <option value="Memuaskan">🟢 Memuaskan</option>
+                                      <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
+                                      <option value="N/A">⚪ N/A</option>
+                                   </select>
+                                   
+                                   <label className="flex items-center justify-center p-2 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 hover:text-orange-600 transition-colors cursor-pointer" title="Attach Photo">
+                                      <Camera size={20}/>
+                                      <input type="file" accept="image/*" capture="environment" className="hidden" />
+                                   </label>
+                                 </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    <div className="p-4 md:p-5 bg-orange-50 rounded-xl border border-orange-200 mt-8 print:border-black print:bg-white print:break-inside-avoid">
+                       <label className="font-black text-orange-900 block mb-2 text-base md:text-lg print:text-black">Overall Remarks / Corrective Actions</label>
+                       <p className="text-xs text-orange-700 mb-3 font-medium print:hidden">Add general observations or details regarding failed parameters.</p>
+                       <textarea 
+                          name="remarks"
+                          className="w-full p-3 md:p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white print:border-black" 
+                          rows="4" 
+                          placeholder="Type your remarks here..."
+                       ></textarea>
+                    </div>
+
+                    <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4 print:hidden">
+                       <button type="button" onClick={() => setActiveTab('dashboard')} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
+                       <button type="submit" className="w-full sm:w-2/3 bg-orange-600 text-white py-3 rounded-xl font-black text-base md:text-lg hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-all">Submit Final Inspection</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+
+            {/* Global Dashboard Footer */}
+            <div className="mt-auto py-6 text-center text-xs text-slate-400 font-medium print:hidden border-t border-slate-200 bg-slate-50 w-full">
+               &copy; 2026 KLSMHSE <br className="md:hidden" /><span className="hidden md:inline mx-2">•</span> Developed by ThadYap
+            </div>
+          </main>
+        </>
+      )}
     </div>
   );
 }
