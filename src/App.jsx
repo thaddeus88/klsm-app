@@ -123,6 +123,12 @@ export default function App() {
   const [tempTimeWindows, setTempTimeWindows] = useState([]);
   const [newTimeWindows, setNewTimeWindows] = useState([{ start: '08:00', end: '17:00' }]);
   
+  // Real-time clock for strict locking
+  const [currentTime, setCurrentTime] = useState(() => {
+    const d = new Date();
+    return d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0');
+  });
+  
   const [attachedPhotos, setAttachedPhotos] = useState({});
   const [photoPreview, setPhotoPreview] = useState({});
 
@@ -132,6 +138,12 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Real-time clock updater every 10 seconds to auto-lock forms
+    const timer = setInterval(() => {
+      const d = new Date();
+      setCurrentTime(d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0'));
+    }, 10000);
+
     const unsubParams = onSnapshot(doc(db, "settings", "parameters"), (docSnap) => {
       if (docSnap.exists()) setParams(docSnap.data().paramsList);
       else setDoc(doc(db, "settings", "parameters"), { paramsList: initialParameters });
@@ -150,7 +162,7 @@ export default function App() {
       setAccidents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { unsubParams(); unsubPersonnel(); unsubInspections(); unsubAccidents(); };
+    return () => { clearInterval(timer); unsubParams(); unsubPersonnel(); unsubInspections(); unsubAccidents(); };
   }, []);
 
   const handleLogin = (e) => {
@@ -285,6 +297,17 @@ export default function App() {
 
   const handleInspectionSubmit = async (e) => {
     e.preventDefault();
+    
+    // Hard check on time expiration at the moment of submission
+    if (!currentUser?.role.includes('Admin')) {
+       const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
+       const isValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
+       if (!isValid) {
+          showToast('❌ Time window expired. Cannot submit inspection.');
+          return;
+       }
+    }
+
     setIsSubmitting(true);
     showToast('⏳ Processing photos and submitting...');
     
@@ -412,10 +435,7 @@ export default function App() {
     return totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0;
   });
 
-  const now = new Date();
-  const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-  
-  // Multi-window time validation
+  // Multi-window live time validation
   const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
   const isTimeValid = currentUser?.role.includes('Admin') || 
                       userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
@@ -610,7 +630,7 @@ export default function App() {
                        </div>
                     </div>
                     
-                    {/* NEW: ZONE PERFORMANCE GRAPH */}
+                    {/* ZONE PERFORMANCE GRAPH */}
                     <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-2">
                        <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)</h3>
                        <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200 mt-6">
@@ -995,7 +1015,15 @@ export default function App() {
 
               {/* INSPECTION FORM TAB */}
               {activeTab === 'inspection-form' && (
-                <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto">
+                <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto relative">
+                  
+                  {/* Warning banner if time expires while form is open */}
+                  {!isTimeValid && !currentUser?.role.includes('Admin') && (
+                     <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold flex items-center gap-2 print:hidden shadow-sm">
+                        <Clock size={20}/> Time window has expired. This inspection is now locked and cannot be submitted.
+                     </div>
+                  )}
+
                   <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6 flex justify-between items-start print:hidden">
                      <div>
                        <h2 className="text-xl md:text-2xl font-black text-slate-900">Conduct Inspection</h2>
@@ -1022,7 +1050,7 @@ export default function App() {
                                    <label className="font-medium text-slate-700 text-sm flex-1 print:text-black">{sp.text}</label>
                                    
                                    <div className="flex w-full sm:w-auto gap-2 items-center print:hidden">
-                                     <select name={`res-${itemKey}`} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none bg-white" defaultValue="" required>
+                                     <select name={`res-${itemKey}`} disabled={!isTimeValid && !currentUser?.role.includes('Admin')} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400" defaultValue="" required>
                                         <option value="" disabled>Pilih Status...</option>
                                         <option value="Memuaskan">🟢 Memuaskan</option>
                                         <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
@@ -1030,7 +1058,7 @@ export default function App() {
                                      </select>
                                      
                                      <label 
-                                        className={`flex items-center justify-center p-2 border rounded-lg transition-colors cursor-pointer ${photoPreview[itemKey] ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-inner' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-orange-600'}`} 
+                                        className={`flex items-center justify-center p-2 border rounded-lg transition-colors ${(!isTimeValid && !currentUser?.role.includes('Admin')) ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed' : photoPreview[itemKey] ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-inner cursor-pointer' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-orange-600 cursor-pointer'}`} 
                                         title={photoPreview[itemKey] ? "Photo Attached!" : "Attach Photo"}
                                      >
                                         {photoPreview[itemKey] ? <Check size={20}/> : <Camera size={20}/>}
@@ -1039,6 +1067,7 @@ export default function App() {
                                           accept="image/*" 
                                           capture="environment" 
                                           className="hidden" 
+                                          disabled={!isTimeValid && !currentUser?.role.includes('Admin')}
                                           onChange={(e) => {
                                             if (e.target.files && e.target.files[0]) {
                                               const file = e.target.files[0];
@@ -1062,7 +1091,8 @@ export default function App() {
                        <p className="text-xs text-orange-700 mb-3 font-medium print:hidden">Add general observations or details regarding failed parameters.</p>
                        <textarea 
                           name="remarks"
-                          className="w-full p-3 md:p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white print:border-black" 
+                          disabled={!isTimeValid && !currentUser?.role.includes('Admin')}
+                          className="w-full p-3 md:p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white print:border-black disabled:bg-slate-100 disabled:text-slate-400" 
                           rows="4" 
                           placeholder="Type your remarks here..."
                        ></textarea>
@@ -1070,8 +1100,16 @@ export default function App() {
 
                     <div className="pt-6 flex flex-col sm:flex-row gap-3 md:gap-4 print:hidden">
                        <button type="button" onClick={() => { setActiveTab('dashboard'); setPhotoPreview({}); setAttachedPhotos({}); setIsSubmitting(false); }} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
-                       <button type="submit" disabled={isSubmitting} className={`w-full sm:w-2/3 py-3 rounded-xl font-black text-base md:text-lg shadow-lg transition-all ${isSubmitting ? 'bg-orange-400 text-orange-100 cursor-not-allowed' : 'bg-orange-600 text-white hover:bg-orange-700 shadow-orange-600/30'}`}>
-                         {isSubmitting ? '⏳ Processing...' : 'Submit Final Inspection'}
+                       <button 
+                          type="submit" 
+                          disabled={isSubmitting || (!isTimeValid && !currentUser?.role.includes('Admin'))} 
+                          className={`w-full sm:w-2/3 py-3 rounded-xl font-black text-base md:text-lg shadow-lg transition-all ${
+                            (!isTimeValid && !currentUser?.role.includes('Admin')) ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
+                            : isSubmitting ? 'bg-orange-400 text-orange-100 cursor-not-allowed' 
+                            : 'bg-orange-600 text-white hover:bg-orange-700 shadow-orange-600/30'
+                          }`}
+                       >
+                         {(!isTimeValid && !currentUser?.role.includes('Admin')) ? 'Locked: Time Expired' : isSubmitting ? '⏳ Processing...' : 'Submit Final Inspection'}
                        </button>
                     </div>
                   </form>
