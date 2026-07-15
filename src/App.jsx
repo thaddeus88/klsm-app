@@ -299,13 +299,11 @@ export default function App() {
     e.preventDefault();
     
     // Hard check on time expiration at the moment of submission
-    if (!currentUser?.role.includes('Admin')) {
-       const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
-       const isValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
-       if (!isValid) {
-          showToast('❌ Time window expired. Cannot submit inspection.');
-          return;
-       }
+    const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
+    const isValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
+    if (!isValid) {
+       showToast('❌ Time window expired. Cannot submit inspection.');
+       return;
     }
 
     setIsSubmitting(true);
@@ -437,8 +435,7 @@ export default function App() {
 
   // Multi-window live time validation
   const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
-  const isTimeValid = currentUser?.role.includes('Admin') || 
-                      userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
+  const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
@@ -523,11 +520,9 @@ export default function App() {
                 <div className="max-w-7xl mx-auto">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
                     <h2 className="text-xl md:text-2xl font-black text-slate-900">Your Assigned Zones</h2>
-                    {!currentUser?.role.includes('Admin') && (
-                      <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                        <Clock size={16}/> Assigned Window: {userWindows.map((w,i) => <span key={i} className="bg-white/50 px-1 rounded">{w.start}-{w.end}</span>)}
-                      </div>
-                    )}
+                    <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                      <Clock size={16}/> Assigned Window: {userWindows.map((w,i) => <span key={i} className="bg-white/50 px-1 rounded">{w.start}-{w.end}</span>)}
+                    </div>
                   </div>
                   
                   {displayedZones.length === 0 ? (
@@ -1018,7 +1013,7 @@ export default function App() {
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto relative">
                   
                   {/* Warning banner if time expires while form is open */}
-                  {!isTimeValid && !currentUser?.role.includes('Admin') && (
+                  {!isTimeValid && (
                      <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold flex items-center gap-2 print:hidden shadow-sm">
                         <Clock size={20}/> Time window has expired. This inspection is now locked and cannot be submitted.
                      </div>
@@ -1050,7 +1045,7 @@ export default function App() {
                                    <label className="font-medium text-slate-700 text-sm flex-1 print:text-black">{sp.text}</label>
                                    
                                    <div className="flex w-full sm:w-auto gap-2 items-center print:hidden">
-                                     <select name={`res-${itemKey}`} disabled={!isTimeValid && !currentUser?.role.includes('Admin')} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400" defaultValue="" required>
+                                     <select name={`res-${itemKey}`} disabled={!isTimeValid} className="flex-1 sm:w-48 p-2 border border-slate-300 rounded-lg font-bold text-slate-700 focus:ring-2 focus:ring-orange-500 outline-none bg-white disabled:bg-slate-100 disabled:text-slate-400" defaultValue="" required>
                                         <option value="" disabled>Pilih Status...</option>
                                         <option value="Memuaskan">🟢 Memuaskan</option>
                                         <option value="Tidak Memuaskan">🔴 Tidak Memuaskan</option>
@@ -1058,7 +1053,7 @@ export default function App() {
                                      </select>
                                      
                                      <label 
-                                        className={`flex items-center justify-center p-2 border rounded-lg transition-colors ${(!isTimeValid && !currentUser?.role.includes('Admin')) ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed' : photoPreview[itemKey] ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-inner cursor-pointer' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-orange-600 cursor-pointer'}`} 
+                                        className={`flex items-center justify-center p-2 border rounded-lg transition-colors ${!isTimeValid ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed' : photoPreview[itemKey] ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-inner cursor-pointer' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-orange-600 cursor-pointer'}`} 
                                         title={photoPreview[itemKey] ? "Photo Attached!" : "Attach Photo"}
                                      >
                                         {photoPreview[itemKey] ? <Check size={20}/> : <Camera size={20}/>}
@@ -1067,7 +1062,7 @@ export default function App() {
                                           accept="image/*" 
                                           capture="environment" 
                                           className="hidden" 
-                                          disabled={!isTimeValid && !currentUser?.role.includes('Admin')}
+                                          disabled={!isTimeValid}
                                           onChange={(e) => {
                                             if (e.target.files && e.target.files[0]) {
                                               const file = e.target.files[0];
@@ -1091,7 +1086,7 @@ export default function App() {
                        <p className="text-xs text-orange-700 mb-3 font-medium print:hidden">Add general observations or details regarding failed parameters.</p>
                        <textarea 
                           name="remarks"
-                          disabled={!isTimeValid && !currentUser?.role.includes('Admin')}
+                          disabled={!isTimeValid}
                           className="w-full p-3 md:p-4 border border-orange-300 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-sm bg-white print:border-black disabled:bg-slate-100 disabled:text-slate-400" 
                           rows="4" 
                           placeholder="Type your remarks here..."
@@ -1102,14 +1097,14 @@ export default function App() {
                        <button type="button" onClick={() => { setActiveTab('dashboard'); setPhotoPreview({}); setAttachedPhotos({}); setIsSubmitting(false); }} className="w-full sm:w-1/3 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors">Cancel</button>
                        <button 
                           type="submit" 
-                          disabled={isSubmitting || (!isTimeValid && !currentUser?.role.includes('Admin'))} 
+                          disabled={isSubmitting || !isTimeValid} 
                           className={`w-full sm:w-2/3 py-3 rounded-xl font-black text-base md:text-lg shadow-lg transition-all ${
-                            (!isTimeValid && !currentUser?.role.includes('Admin')) ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
+                            !isTimeValid ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' 
                             : isSubmitting ? 'bg-orange-400 text-orange-100 cursor-not-allowed' 
                             : 'bg-orange-600 text-white hover:bg-orange-700 shadow-orange-600/30'
                           }`}
                        >
-                         {(!isTimeValid && !currentUser?.role.includes('Admin')) ? 'Locked: Time Expired' : isSubmitting ? '⏳ Processing...' : 'Submit Final Inspection'}
+                         {!isTimeValid ? 'Locked: Time Expired' : isSubmitting ? '⏳ Processing...' : 'Submit Final Inspection'}
                        </button>
                     </div>
                   </form>
