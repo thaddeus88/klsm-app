@@ -421,30 +421,153 @@ export default function App() {
   const monthlyComp = monthlyCompData.map(d => d.count > 0 ? Math.round(d.sum / d.count) : 0);
 
   const zonePerformanceData = initialZones.map(zone => {
-    const zoneInspections = inspections.filter(i => i.zone === zone);
+    const zoneInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => i.zone === zone);
     if (zoneInspections.length === 0) return 0;
     let memuaskan = 0; let totalScored = 0;
     zoneInspections.forEach(insp => {
       Object.values(insp.results || {}).forEach(val => {
-        if (val === "Memuaskan") { memuaskan++; totalScored++; }
-        if (val === "Tidak Memuaskan") { totalScored++; }
+        // Fixed: Now checks for both English and Malay dropdown values
+        if (val === "Memuaskan" || val === "Pass") { memuaskan++; totalScored++; }
+        if (val === "Tidak Memuaskan" || val === "Fail") { totalScored++; }
       });
     });
     return totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0;
   });
 
+  // Calculate dynamic max for scaling Monthly Inspections graph to fit the numbers perfectly
+  const allMonthlyCounts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIdx => {
+    return (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx).length;
+  });
+  const maxMonthlyScale = Math.max(10, Math.ceil(Math.max(...allMonthlyCounts) / 10) * 10);
+
   // Multi-window live time validation
   const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
-  const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
+            {activeTab === 'admin-analytics' && (
+              <div className="max-w-7xl mx-auto space-y-8">
+                <h2 className="text-2xl font-black text-slate-900">Analytics & Performance</h2>
+                
+                {/* MONTHLY TABULATION GRAPHS */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {/* 1. Monthly Inspections Tabulation */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
+                      <BarChart3 className="text-orange-600"/> Monthly Inspections Conducted
+                    </h3>
+                    <div className="flex-1 flex items-end justify-between gap-2 h-64 mt-4 pt-4 border-t border-slate-100 relative">
+                      {/* Dynamic Y-Axis Labels based on maxMonthlyScale */}
+                      <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs font-bold text-slate-400">
+                        <span>{maxMonthlyScale}</span>
+                        <span>{Math.round(maxMonthlyScale / 2)}</span>
+                        <span>0</span>
+                      </div>
+                      <div className="pl-8 flex w-full justify-between items-end h-full">
+                        {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, idx) => {
+                          const count = allMonthlyCounts[idx];
+                          // Scales the bar dynamically relative to the maxMonthlyScale
+                          const heightPct = count > 0 ? (count / maxMonthlyScale) * 100 : 0;
+                          const isActiveMonth = idx === new Date().getMonth();
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
-      
-      {toastMsg && (
-        <div className="fixed bottom-6 right-6 bg-slate-900 text-white font-bold px-6 py-4 rounded-xl shadow-2xl z-50 animate-bounce print:hidden border border-slate-700 flex items-center gap-2">
-          {toastMsg}
-        </div>
-      )}
+                          return (
+                            <div key={month} className="flex flex-col items-center gap-2 group flex-1">
+                              <div className="w-full relative flex justify-center items-end h-48 bg-slate-50 rounded-t-md">
+                                <div 
+                                  className={`w-full max-w-[40px] rounded-t-md transition-all duration-500 ${isActiveMonth ? 'bg-orange-500' : 'bg-slate-300 group-hover:bg-orange-400'}`}
+                                  style={{ height: `${heightPct}%` }}
+                                >
+                                  {count > 0 && (
+                                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-black text-slate-700">{count}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className={`text-xs font-bold ${isActiveMonth ? 'text-orange-600' : 'text-slate-500'}`}>{month}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Monthly Zone Compliance (Average %) */}
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
+                      <BarChart3 className="text-orange-600"/> Monthly Zone Compliance (Avg %)
+                    </h3>
+                    <div className="flex-1 flex items-end justify-between gap-2 h-64 mt-4 pt-4 border-t border-slate-100 relative">
+                      {/* Fixed 0-100% Y-Axis Labels */}
+                      <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs font-bold text-slate-400">
+                        <span>100%</span>
+                        <span>50%</span>
+                        <span>0%</span>
+                      </div>
+                      <div className="pl-10 flex w-full justify-between items-end h-full">
+                        {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, idx) => {
+                           const monthInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === idx);
+                           let pass = 0; let total = 0;
+                           monthInspections.forEach(insp => {
+                             Object.values(insp.results || {}).forEach(val => {
+                               if (val === "Memuaskan" || val === "Pass") { pass++; total++; }
+                               if (val === "Tidak Memuaskan" || val === "Fail") { total++; }
+                             });
+                           });
+                           const compliance = total > 0 ? Math.round((pass / total) * 100) : 0;
+                           const colorClass = compliance >= 80 ? 'bg-emerald-500' : compliance >= 50 ? 'bg-amber-400' : compliance > 0 ? 'bg-red-500' : 'bg-slate-200';
+                           const isActiveMonth = idx === new Date().getMonth();
+
+                           return (
+                             <div key={month} className="flex flex-col items-center gap-2 group flex-1">
+                               <div className="w-full relative flex justify-center items-end h-48 bg-slate-50 rounded-t-md">
+                                 <div 
+                                   className={`w-full max-w-[40px] rounded-t-md transition-all duration-500 ${compliance > 0 ? colorClass : 'bg-transparent'} ${isActiveMonth && compliance===0 ? 'border-b-4 border-orange-500' : ''}`}
+                                   style={{ height: `${compliance}%` }}
+                                 >
+                                   {compliance > 0 && (
+                                     <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-black text-slate-700">{compliance}%</span>
+                                   )}
+                                 </div>
+                               </div>
+                               <span className={`text-xs font-bold ${isActiveMonth ? 'text-orange-600' : 'text-slate-500'}`}>{month}</span>
+                             </div>
+                           );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Overall Compliance by Zone (All Time) */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
+                    <BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {initialZones.map((zone, idx) => {
+                      const score = zonePerformanceData[idx];
+                      const hasData = (typeof inspections !== 'undefined' ? inspections : []).some(i => i.zone === zone);
+                      const color = score >= 80 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : score >= 50 ? 'text-amber-600 bg-amber-50 border-amber-200' : hasData ? 'text-red-600 bg-red-50 border-red-200' : 'text-slate-500 bg-slate-50 border-slate-200';
+                      
+                      return (
+                        <div key={idx} className={`p-4 rounded-xl border flex flex-col justify-between h-full ${color}`}>
+                          <h4 className="font-bold text-sm mb-4 leading-snug">{zone}</h4>
+                          <div className="flex items-end justify-between">
+                            <span className="text-3xl font-black">{hasData ? `${score}%` : 'N/A'}</span>
+                            <span className="text-xs font-bold uppercase opacity-70">Compliance</span>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="w-full bg-white/50 rounded-full h-2 mt-3 overflow-hidden">
+                            <div className="bg-current h-full rounded-full transition-all duration-700" style={{ width: `${hasData ? score : 0}%` }}></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                    </div>
+                    <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                      <Clock size={16}/> Assigned Window: {userWindows.map((w,i) => <span key={i} className="bg-white/50 px-1 rounded">{w.start}-{w.end}</span>)}
+                    </div>
+                  </div>
+                  
+                  {displayedZones.length === 0 ? (
 
       {/* LOGIN SCREEN */}
       {activeTab === 'login' ? (
