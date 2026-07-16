@@ -398,6 +398,7 @@ export default function App() {
   const currentYear = new Date().getFullYear();
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
+  // Data Logic Restructured for Graph Fixes
   const monthlyCounts = new Array(12).fill(0);
   const monthlyCompData = Array.from({length: 12}, () => ({ sum: 0, count: 0 }));
 
@@ -417,12 +418,17 @@ export default function App() {
       }
     }
   });
-  const maxCount = Math.max(...monthlyCounts, 1);
-  const monthlyComp = monthlyCompData.map(d => d.count > 0 ? Math.round(d.sum / d.count) : 0);
+
+  // Ensure minimum scale logic to prevent single counts blowing up graph sizes
+  const maxCount = Math.max(...monthlyCounts, 10); 
+  const monthlyCompDataMap = monthlyCompData.map(d => ({
+    avg: d.count > 0 ? Math.round(d.sum / d.count) : 0,
+    hasData: d.count > 0
+  }));
 
   const zonePerformanceData = initialZones.map(zone => {
     const zoneInspections = inspections.filter(i => i.zone === zone);
-    if (zoneInspections.length === 0) return 0;
+    if (zoneInspections.length === 0) return { avg: 0, hasData: false }; // Tracks true empties vs 0%
     let memuaskan = 0; let totalScored = 0;
     zoneInspections.forEach(insp => {
       Object.values(insp.results || {}).forEach(val => {
@@ -430,7 +436,7 @@ export default function App() {
         if (val === "Tidak Memuaskan") { totalScored++; }
       });
     });
-    return totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0;
+    return { avg: totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0, hasData: true };
   });
 
   // Multi-window live time validation
@@ -601,49 +607,95 @@ export default function App() {
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 print:hidden">
+                    
                     <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                        <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Monthly Inspections ({currentYear})</h3>
-                       <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200 mt-6">
-                         {monthlyCounts.map((count, idx) => (
-                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
-                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{count}</span>
-                               <div className="w-full bg-orange-500 rounded-t-md transition-all duration-300 group-hover:bg-orange-600" style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0px' }}></div>
-                            </div>
-                         ))}
-                       </div>
-                       <div className="flex gap-1 md:gap-3 mt-2">
-                         {months.map(m => <div key={m} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold">{m}</div>)}
+                       <div className="mt-8 ml-6 md:ml-8 relative">
+                          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                            {[1, 0.75, 0.5, 0.25, 0].map((ratio, i) => (
+                               <div key={i} className="border-t border-slate-100 w-full h-0 relative">
+                                  <span className="absolute -left-6 md:-left-8 -translate-y-1/2 text-[10px] text-slate-400 font-medium">{Math.round(maxCount * ratio)}</span>
+                               </div>
+                            ))}
+                          </div>
+                          <div className="flex items-end gap-1 md:gap-3 h-48 border-b border-slate-300 relative z-10 pb-0">
+                            {monthlyCounts.map((count, idx) => (
+                               <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative h-full">
+                                  <span className="text-xs font-bold text-slate-600 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{count}</span>
+                                  <div className="w-full bg-orange-500 rounded-t-sm transition-all duration-300 group-hover:bg-orange-600" style={{ height: `${(count / maxCount) * 100}%`, minHeight: count > 0 ? '4px' : '0px' }}></div>
+                               </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-1 md:gap-3 mt-2 relative z-10">
+                            {months.map(m => <div key={m} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold">{m}</div>)}
+                          </div>
                        </div>
                     </div>
 
                     <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                        <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><Activity className="text-orange-600"/> Average Zone Compliance ({currentYear})</h3>
-                       <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200 mt-6">
-                         {monthlyComp.map((avg, idx) => (
-                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
-                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{avg}%</span>
-                               <div className={`w-full rounded-t-md transition-all duration-300 ${avg >= 90 ? 'bg-emerald-500 group-hover:bg-emerald-600' : (avg >= 70 ? 'bg-amber-500 group-hover:bg-amber-600' : (avg === 0 ? 'bg-transparent' : 'bg-red-500 group-hover:bg-red-600'))}`} style={{ height: `${avg}%`, minHeight: avg > 0 ? '4px' : '0px' }}></div>
-                            </div>
-                         ))}
-                       </div>
-                       <div className="flex gap-1 md:gap-3 mt-2">
-                         {months.map(m => <div key={m} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold">{m}</div>)}
+                       <div className="mt-8 ml-6 md:ml-8 relative">
+                          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                            {[100, 75, 50, 25, 0].map((val, i) => (
+                               <div key={i} className="border-t border-slate-100 w-full h-0 relative">
+                                  <span className="absolute -left-6 md:-left-8 -translate-y-1/2 text-[10px] text-slate-400 font-medium">{val}%</span>
+                               </div>
+                            ))}
+                          </div>
+                          <div className="flex items-end gap-1 md:gap-3 h-48 border-b border-slate-300 relative z-10 pb-0">
+                            {monthlyCompDataMap.map((data, idx) => (
+                               <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative h-full">
+                                  {data.hasData ? (
+                                    <>
+                                      <span className="text-xs font-bold text-slate-600 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{data.avg}%</span>
+                                      <div className={`w-full rounded-t-sm transition-all duration-300 ${data.avg >= 90 ? 'bg-emerald-500 hover:bg-emerald-600' : (data.avg >= 70 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-red-500 hover:bg-red-600')}`} style={{ height: `${Math.max(data.avg, 2)}%` }}></div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-[10px] font-bold text-slate-400 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">N/A</span>
+                                      <div className="w-full bg-slate-100 hover:bg-slate-200 rounded-t-sm transition-all duration-300" style={{ height: '2%' }}></div>
+                                    </>
+                                  )}
+                               </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-1 md:gap-3 mt-2 relative z-10">
+                            {months.map(m => <div key={m} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold">{m}</div>)}
+                          </div>
                        </div>
                     </div>
                     
                     {/* ZONE PERFORMANCE GRAPH */}
                     <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-2">
                        <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)</h3>
-                       <div className="flex items-end gap-1 md:gap-3 h-48 pt-4 border-b border-slate-200 mt-6">
-                         {zonePerformanceData.map((avg, idx) => (
-                            <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative">
-                               <span className="text-xs font-bold text-slate-500 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{avg}%</span>
-                               <div className={`w-full rounded-t-md transition-all duration-300 ${avg >= 90 ? 'bg-emerald-500 hover:bg-emerald-600' : (avg >= 70 ? 'bg-amber-500 hover:bg-amber-600' : (avg === 0 ? 'bg-slate-200 hover:bg-slate-300' : 'bg-red-500 hover:bg-red-600'))}`} style={{ height: `${avg === 0 ? 2 : avg}%` }}></div>
-                            </div>
-                         ))}
-                       </div>
-                       <div className="flex gap-1 md:gap-3 mt-2">
-                         {initialZones.map((z, idx) => <div key={idx} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold truncate px-1" title={z}>Z{idx+1}</div>)}
+                       <div className="mt-8 ml-6 md:ml-8 relative">
+                          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                            {[100, 75, 50, 25, 0].map((val, i) => (
+                               <div key={i} className="border-t border-slate-100 w-full h-0 relative">
+                                  <span className="absolute -left-6 md:-left-8 -translate-y-1/2 text-[10px] text-slate-400 font-medium">{val}%</span>
+                               </div>
+                            ))}
+                          </div>
+                          <div className="flex items-end gap-1 md:gap-3 h-48 border-b border-slate-300 relative z-10 pb-0">
+                            {zonePerformanceData.map((data, idx) => (
+                               <div key={idx} className="flex-1 flex flex-col items-center justify-end group relative h-full">
+                                  {data.hasData ? (
+                                    <>
+                                      <span className="text-xs font-bold text-slate-600 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">{data.avg}%</span>
+                                      <div className={`w-full rounded-t-sm transition-all duration-300 ${data.avg >= 90 ? 'bg-emerald-500 hover:bg-emerald-600' : (data.avg >= 70 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-red-500 hover:bg-red-600')}`} style={{ height: `${Math.max(data.avg, 2)}%` }}></div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-[10px] font-bold text-slate-400 mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">N/A</span>
+                                      <div className="w-full bg-slate-100 hover:bg-slate-200 rounded-t-sm transition-all duration-300" style={{ height: '2%' }}></div>
+                                    </>
+                                  )}
+                               </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-1 md:gap-3 mt-2 relative z-10">
+                            {initialZones.map((z, idx) => <div key={idx} className="flex-1 text-center text-[10px] sm:text-xs text-slate-400 font-bold truncate px-1" title={z}>Z{idx+1}</div>)}
+                          </div>
                        </div>
                     </div>
                   </div>
