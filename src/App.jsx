@@ -123,8 +123,6 @@ export default function App() {
   const [tempTimeWindows, setTempTimeWindows] = useState([]);
   const [newTimeWindows, setNewTimeWindows] = useState([{ start: '08:00', end: '17:00' }]);
   
-  const [historyFilter, setHistoryFilter] = useState('All');
-
   // Real-time clock for strict locking
   const [currentTime, setCurrentTime] = useState(() => {
     const d = new Date();
@@ -820,27 +818,14 @@ export default function App() {
 
                   {/* ALL HISTORICAL RECORDS */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                      <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Records</h3>
-                      <select 
-                        value={historyFilter} 
-                        onChange={(e) => setHistoryFilter(e.target.value)}
-                        className="p-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 outline-none bg-slate-50 focus:ring-2 focus:ring-orange-500"
-                      >
-                        <option value="All">All Zones</option>
-                        {initialZones.map((z, idx) => <option key={idx} value={z}>{z}</option>)}
-                      </select>
-                    </div>
+                    <h3 className="font-bold text-base md:text-lg mb-2 text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Records</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                       <table className="w-full text-sm text-left min-w-[600px]">
                         <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
                           <tr><th className="p-3 md:p-4 rounded-tl-xl">Date & Time</th><th className="p-3 md:p-4">Zone</th><th className="p-3 md:p-4">Inspector</th><th className="p-3 md:p-4 rounded-tr-xl">Action</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {[...inspections]
-                            .filter(insp => historyFilter === 'All' || insp.zone === historyFilter)
-                            .sort((a,b) => new Date(b.date) - new Date(a.date))
-                            .map(insp => (
+                          {inspections.sort((a,b) => new Date(b.date) - new Date(a.date)).map(insp => (
                             <tr key={insp.id} className="hover:bg-slate-50/50">
                               <td className="p-3 md:p-4 font-medium text-slate-700">{new Date(insp.date).toLocaleString()}</td>
                               <td className="p-3 md:p-4 text-slate-800 font-bold">{insp.zone}</td>
@@ -848,9 +833,6 @@ export default function App() {
                               <td className="p-3 md:p-4"><button onClick={() => { setSelectedReport(insp); setActiveTab('view-report'); }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-100 text-orange-700 hover:bg-orange-200"><Eye size={14}/> View</button></td>
                             </tr>
                           ))}
-                          {inspections.filter(insp => historyFilter === 'All' || insp.zone === historyFilter).length === 0 && (
-                            <tr><td colSpan="4" className="p-4 text-center text-slate-500 italic">No records found.</td></tr>
-                          )}
                         </tbody>
                       </table>
                     </div>
