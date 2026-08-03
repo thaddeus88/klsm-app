@@ -1,6 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { db } from './firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
-// Inline SVG Icon Components to bypass Vercel dependency errors
+// Inline SVG Icon Components
 const IconWrapper = ({ children, size = 24, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
 );
@@ -96,22 +98,10 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // LOCAL STORAGE STATE INITIALIZATION
-  const [personnel, setPersonnel] = useState(() => {
-    const saved = localStorage.getItem('klsm_personnel');
-    return saved ? JSON.parse(saved) : initialUsers;
-  });
-  
-  const [inspections, setInspections] = useState(() => {
-    const saved = localStorage.getItem('klsm_inspections');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [accidents, setAccidents] = useState(() => {
-    const saved = localStorage.getItem('klsm_accidents');
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  // CLOUD STATE INITIALIZATION (Replaces LocalStorage)
+  const [personnel, setPersonnel] = useState(initialUsers);
+  const [inspections, setInspections] = useState([]);
+  const [accidents, setAccidents] = useState([]);
   const [selectedZone, setSelectedZone] = useState(null);
   const [loginError, setLoginError] = useState('');
 
@@ -133,37 +123,55 @@ export default function App() {
   const [newUserWindows, setNewUserWindows] = useState([{ start: "08:00", end: "17:00" }]);
   const [newUserOffDays, setNewUserOffDays] = useState([]);
 
-  // Fire Fighting Checklist States (WITH LOCAL STORAGE)
+  // Fire Fighting Checklist States
   const [ffActiveTab, setFfActiveTab] = useState('extinguisher');
-  
-  const [fireExtinguishers, setFireExtinguishers] = useState(() => {
-    const saved = localStorage.getItem('klsm_fireExtinguishers');
-    return saved ? JSON.parse(saved) : [{ id: 1, type: '', expiry: '', location: '', mfgDate: '' }];
-  });
-  
-  const [hydrantCheck, setHydrantCheck] = useState(() => {
-    const saved = localStorage.getItem('klsm_hydrantCheck');
-    return saved ? JSON.parse(saved) : {};
-  });
-  
-  const [hoseReelCheck, setHoseReelCheck] = useState(() => {
-    const saved = localStorage.getItem('klsm_hoseReelCheck');
-    return saved ? JSON.parse(saved) : {};
-  });
-  
-  const [pumpCheck, setPumpCheck] = useState(() => {
-    const saved = localStorage.getItem('klsm_pumpCheck');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [fireExtinguishers, setFireExtinguishers] = useState([{ id: 1, type: '', expiry: '', location: '', mfgDate: '' }]);
+  const [hydrantCheck, setHydrantCheck] = useState({});
+  const [hoseReelCheck, setHoseReelCheck] = useState({});
+  const [pumpCheck, setPumpCheck] = useState({});
 
-  // AUTO-SAVE EFFECTS TO LOCAL STORAGE
-  useEffect(() => localStorage.setItem('klsm_personnel', JSON.stringify(personnel)), [personnel]);
-  useEffect(() => localStorage.setItem('klsm_inspections', JSON.stringify(inspections)), [inspections]);
-  useEffect(() => localStorage.setItem('klsm_accidents', JSON.stringify(accidents)), [accidents]);
-  useEffect(() => localStorage.setItem('klsm_fireExtinguishers', JSON.stringify(fireExtinguishers)), [fireExtinguishers]);
-  useEffect(() => localStorage.setItem('klsm_hydrantCheck', JSON.stringify(hydrantCheck)), [hydrantCheck]);
-  useEffect(() => localStorage.setItem('klsm_hoseReelCheck', JSON.stringify(hoseReelCheck)), [hoseReelCheck]);
-  useEffect(() => localStorage.setItem('klsm_pumpCheck', JSON.stringify(pumpCheck)), [pumpCheck]);
+  // FIREBASE REAL-TIME LISTENERS
+  useEffect(() => {
+    if (!db) return;
+    const unsubs = [];
+
+    try {
+      unsubs.push(onSnapshot(collection(db, 'personnel'), (snap) => {
+        if (!snap.empty) {
+          // Fallback map ensures integer IDs are retained
+          setPersonnel(snap.docs.map(d => ({ ...d.data(), id: parseInt(d.id) })));
+        }
+      }));
+
+      unsubs.push(onSnapshot(collection(db, 'inspections'), (snap) => {
+        setInspections(snap.docs.map(d => d.data()));
+      }));
+
+      unsubs.push(onSnapshot(collection(db, 'accidents'), (snap) => {
+        setAccidents(snap.docs.map(d => d.data()));
+      }));
+
+      unsubs.push(onSnapshot(collection(db, 'fireExtinguishers'), (snap) => {
+        if (!snap.empty) setFireExtinguishers(snap.docs.map(d => d.data()));
+      }));
+
+      unsubs.push(onSnapshot(doc(db, 'fireEquipment', 'hydrantCheck'), (docSnap) => {
+        if (docSnap.exists()) setHydrantCheck(docSnap.data());
+      }));
+
+      unsubs.push(onSnapshot(doc(db, 'fireEquipment', 'hoseReelCheck'), (docSnap) => {
+        if (docSnap.exists()) setHoseReelCheck(docSnap.data());
+      }));
+
+      unsubs.push(onSnapshot(doc(db, 'fireEquipment', 'pumpCheck'), (docSnap) => {
+        if (docSnap.exists()) setPumpCheck(docSnap.data());
+      }));
+    } catch (error) {
+      console.error("Firebase connection error:", error);
+    }
+
+    return () => unsubs.forEach(unsub => unsub());
+  }, []);
 
   // LIVE CLOCK
   useEffect(() => {
@@ -174,11 +182,10 @@ export default function App() {
   }, []);
 
   // ROLE & ACCESS LOGIC
-  // "Admin" is kept for legacy compatibility for any existing saved users
   const isAdmin1 = currentUser?.role === 'Admin Level 1' || currentUser?.role === 'Admin';
   const isAdmin2 = currentUser?.role === 'Admin Level 2';
   const isAnyAdmin = isAdmin1 || isAdmin2;
-  const isFireEqReadOnly = isAdmin2; // Admin Level 2 can view, but cannot edit fire equipment
+  const isFireEqReadOnly = isAdmin2; 
 
   // Centralized time validation for all users (No admin bypass)
   const userWindows = currentUser?.timeWindows || [{ start: "00:00", end: "23:59" }];
@@ -205,18 +212,23 @@ export default function App() {
     }
   };
 
-  const saveEditedPassword = (userId) => {
+  // --- FIREBASE WRITE ACTIONS ---
+
+  const saveEditedPassword = async (userId) => {
     if (newPasswordValue.trim() === "") {
         showToast("Password cannot be empty.");
         return;
     }
-    setPersonnel(personnel.map(p => p.id === userId ? { ...p, password: newPasswordValue } : p));
+    const userToUpdate = personnel.find(p => p.id === userId);
+    const updatedUser = { ...userToUpdate, password: newPasswordValue };
+    
+    await setDoc(doc(db, 'personnel', userId.toString()), updatedUser);
     setPasswordEditId(null);
     setNewPasswordValue("");
     showToast("Password updated successfully.");
   };
 
-  const addPersonnel = (e) => {
+  const addPersonnel = async (e) => {
     e.preventDefault();
     const checkedZones = Array.from(e.target.zone || [])
       .filter(checkbox => checkbox.checked)
@@ -235,32 +247,34 @@ export default function App() {
       timeWindows: [...newUserWindows],
       offDays: [...newUserOffDays]
     };
-    setPersonnel([...personnel, newPerson]);
+
+    await setDoc(doc(db, 'personnel', newPerson.id.toString()), newPerson);
     setNewUserWindows([{ start: "08:00", end: "17:00" }]);
     setNewUserOffDays([]);
     e.target.reset();
-    showToast("Personnel added successfully!");
+    showToast("Personnel added to Cloud successfully!");
   };
 
-  const saveEditedUser = () => {
-    setPersonnel(personnel.map(p => p.id === editUserForm.id ? editUserForm : p));
+  const saveEditedUser = async () => {
+    await setDoc(doc(db, 'personnel', editUserForm.id.toString()), editUserForm);
     setEditingUserId(null);
     setEditUserForm(null);
-    showToast("Schedule updated successfully.");
+    showToast("Schedule updated in Cloud successfully.");
   };
 
-  const handleInspectionSubmit = (e) => {
+  const deleteUser = async (id) => {
+    await deleteDoc(doc(db, 'personnel', id.toString()));
+    showToast("User removed from Cloud.");
+  };
+
+  const handleInspectionSubmit = async (e) => {
     e.preventDefault();
-    
-    // Hard check on time expiration at the moment of submission
     if (!isTimeValid) {
        showToast('❌ Time window expired. Cannot submit inspection.');
        return;
     }
 
     setIsSubmitting(true);
-    
-    // Robust capture of all dynamic dropdowns
     const formData = new FormData(e.target);
     let results = {};
     for (let [key, value] of formData.entries()) {
@@ -279,17 +293,20 @@ export default function App() {
       photos: attachedPhotos 
     };
 
-    setTimeout(() => {
-      setInspections([...inspections, newInspection]);
+    try {
+      await setDoc(doc(db, 'inspections', newInspection.id.toString()), newInspection);
       setIsSubmitting(false);
       setPhotoPreview({});
       setAttachedPhotos({});
       setActiveTab('dashboard');
-      showToast('✅ Inspection Submitted Successfully!');
-    }, 1500); 
+      showToast('✅ Inspection Saved to Cloud!');
+    } catch (err) {
+      showToast('❌ Error connecting to database.');
+      setIsSubmitting(false);
+    }
   };
 
-  const handleAccidentSubmit = (e) => {
+  const handleAccidentSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const newAccident = {
@@ -301,23 +318,49 @@ export default function App() {
       reportedBy: currentUser.name,
       timestamp: new Date().toISOString()
     };
-    setAccidents([...accidents, newAccident]);
+    
+    await setDoc(doc(db, 'accidents', newAccident.id.toString()), newAccident);
     e.target.reset();
     setActiveTab('dashboard');
-    showToast('🚨 Accident Report Submitted Successfully!');
+    showToast('🚨 Accident Report Saved to Cloud!');
   };
 
-  const addExtinguisher = () => {
-    setFireExtinguishers([...fireExtinguishers, { id: Date.now(), type: '', expiry: '', location: '', mfgDate: '' }]);
+  // Fire Equipment Cloud Writers
+  const addExtinguisher = async () => {
+    const newExt = { id: Date.now(), type: '', expiry: '', location: '', mfgDate: '' };
+    await setDoc(doc(db, 'fireExtinguishers', newExt.id.toString()), newExt);
   };
 
-  const updateExtinguisher = (id, field, value) => {
-    setFireExtinguishers(fireExtinguishers.map(ext => ext.id === id ? { ...ext, [field]: value } : ext));
+  const updateExtinguisher = async (id, field, value) => {
+    const ext = fireExtinguishers.find(e => e.id === id);
+    if (ext) {
+       await setDoc(doc(db, 'fireExtinguishers', id.toString()), { ...ext, [field]: value });
+    }
   };
 
-  const deleteExtinguisher = (id) => {
-    setFireExtinguishers(fireExtinguishers.filter(ext => ext.id !== id));
+  const deleteExtinguisher = async (id) => {
+    await deleteDoc(doc(db, 'fireExtinguishers', id.toString()));
   };
+
+  const updateHydrantCheck = async (key, value) => {
+    const newData = {...hydrantCheck, [key]: value};
+    setHydrantCheck(newData);
+    await setDoc(doc(db, 'fireEquipment', 'hydrantCheck'), newData);
+  };
+
+  const updateHoseReelCheck = async (key, value) => {
+    const newData = {...hoseReelCheck, [key]: value};
+    setHoseReelCheck(newData);
+    await setDoc(doc(db, 'fireEquipment', 'hoseReelCheck'), newData);
+  };
+
+  const updatePumpCheck = async (key, value) => {
+    const newData = {...pumpCheck, [key]: value};
+    setPumpCheck(newData);
+    await setDoc(doc(db, 'fireEquipment', 'pumpCheck'), newData);
+  };
+
+  // --- END FIREBASE WRITERS ---
 
   const displayedZones = isAnyAdmin 
     ? initialZones 
@@ -325,7 +368,7 @@ export default function App() {
 
   // Analytics Calculations
   const zonePerformanceData = initialZones.map(zone => {
-    const zoneInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => i.zone === zone);
+    const zoneInspections = inspections.filter(i => i.zone === zone);
     if (zoneInspections.length === 0) return 0;
     let memuaskan = 0; let totalScored = 0;
     zoneInspections.forEach(insp => {
@@ -340,14 +383,14 @@ export default function App() {
   });
 
   const allMonthlyCounts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIdx => {
-    return (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx).length;
+    return inspections.filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx).length;
   });
   
   const maxMonthlyCount = Math.max(...allMonthlyCounts, 0);
   const maxMonthlyScale = Math.max(2, maxMonthlyCount % 2 === 0 ? maxMonthlyCount : maxMonthlyCount + 1);
 
   const allMonthlyCompliances = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIdx => {
-    const monthInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx);
+    const monthInspections = inspections.filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx);
     let pass = 0; let total = 0;
     monthInspections.forEach(insp => {
       Object.values(insp.results || {}).forEach(val => {
@@ -561,7 +604,7 @@ export default function App() {
                      {isFireEqReadOnly ? (
                         <div className="ml-auto bg-slate-200 text-slate-500 px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2"><ShieldAlert size={16}/> Read Only Mode</div>
                      ) : (
-                        <button onClick={() => showToast("✅ All data is saved automatically!")} className="ml-auto bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex items-center gap-2"><Save size={16}/> Saved Automatically</button>
+                        <div className="ml-auto bg-emerald-100 text-emerald-700 px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2"><Save size={16}/> Cloud Synced</div>
                      )}
                   </div>
                 </div>
@@ -589,7 +632,7 @@ export default function App() {
                                 const key = `${loc}-${item}`;
                                 return (
                                   <td key={key} className="p-2 text-center">
-                                    <select disabled={isFireEqReadOnly} value={hydrantCheck[key] || ''} onChange={(e) => setHydrantCheck({...hydrantCheck, [key]: e.target.value})} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
+                                    <select disabled={isFireEqReadOnly} value={hydrantCheck[key] || ''} onChange={(e) => updateHydrantCheck(key, e.target.value)} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
                                       <option value="" disabled>Status...</option>
                                       <option value="Memuaskan">Memuaskan</option>
                                       <option value="Tidak Memuaskan">Tidak Memuaskan</option>
@@ -630,11 +673,11 @@ export default function App() {
                                         type="text" 
                                         placeholder="Add remarks..." 
                                         value={hoseReelCheck[key] || ''} 
-                                        onChange={(e) => setHoseReelCheck({...hoseReelCheck, [key]: e.target.value})} 
+                                        onChange={(e) => updateHoseReelCheck(key, e.target.value)} 
                                         className="w-full min-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500"
                                       />
                                     ) : (
-                                      <select disabled={isFireEqReadOnly} value={hoseReelCheck[key] || ''} onChange={(e) => setHoseReelCheck({...hoseReelCheck, [key]: e.target.value})} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
+                                      <select disabled={isFireEqReadOnly} value={hoseReelCheck[key] || ''} onChange={(e) => updateHoseReelCheck(key, e.target.value)} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
                                         <option value="" disabled>Status...</option>
                                         <option value="Memuaskan">Memuaskan</option>
                                         <option value="Tidak Memuaskan">Tidak Memuaskan</option>
@@ -683,7 +726,7 @@ export default function App() {
 
                                 return (
                                   <td key={key} className="p-2 text-center">
-                                    <select disabled={isFireEqReadOnly} value={pumpCheck[key] || ''} onChange={(e) => setPumpCheck({...pumpCheck, [key]: e.target.value})} className="w-full max-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
+                                    <select disabled={isFireEqReadOnly} value={pumpCheck[key] || ''} onChange={(e) => updatePumpCheck(key, e.target.value)} className="w-full max-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
                                       <option value="" disabled>Status...</option>
                                       <option value="Memuaskan">Memuaskan</option>
                                       <option value="Tidak Memuaskan">Tidak Memuaskan</option>
@@ -703,7 +746,7 @@ export default function App() {
                      {isFireEqReadOnly ? (
                         <div className="bg-slate-200 text-slate-500 px-8 py-3 rounded-xl font-black shadow-none flex items-center gap-2"><ShieldAlert size={20}/> Read Only Mode</div>
                      ) : (
-                        <button onClick={() => showToast("✅ All checklists are saved automatically!")} className="bg-orange-600 text-white px-8 py-3 rounded-xl font-black shadow-lg hover:bg-orange-700 transition-colors flex items-center gap-2"><Save size={20}/> Saved Automatically</button>
+                        <div className="bg-emerald-100 text-emerald-700 px-8 py-3 rounded-xl font-black shadow-lg flex items-center gap-2"><Save size={20}/> Cloud Synced</div>
                      )}
                   </div>
                 </div>
@@ -1089,7 +1132,7 @@ export default function App() {
                              <div className="flex justify-end gap-2">
                                <button onClick={() => { setEditingUserId(p.id); setEditUserForm(JSON.parse(JSON.stringify(p))); setPasswordEditId(null); }} title="Edit Schedule" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 size={16}/></button>
                                <button onClick={() => { setPasswordEditId(p.id); setEditingUserId(null); setNewPasswordValue(""); }} title="Reset Password" className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><Key size={16}/></button>
-                               <button onClick={() => setPersonnel(personnel.filter(u => u.id !== p.id))} title="Delete User" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                               <button onClick={() => deleteUser(p.id)} title="Delete User" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
                              </div>
                           </td>
                         </tr>
