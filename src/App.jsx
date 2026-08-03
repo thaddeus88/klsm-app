@@ -954,20 +954,20 @@ export default function App() {
                 </div>
               )}
 
-              {}
+              {/* FIRE FIGHTING EQUIPMENT TAB */}
               {activeTab === 'fire-equipment' && currentUser?.role?.includes('Admin') && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                     <div>
-                      <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><Flame className="text-red-600"/> Fire Fighting Equipment Checklist</h2>
+                      <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2 print:text-black"><Flame className="text-red-600 print:text-black"/> Fire Fighting Equipment Checklist</h2>
                       {((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated) && (
-                        <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-1.5">
+                        <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-1.5 print:text-black">
                           <Clock size={16}/> Last updated: {new Date((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated).toLocaleString()}
                         </p>
                       )}
                     </div>
                     {isLevel1Admin && (
-                       <button onClick={saveFireData} disabled={isSubmitting} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-red-600/30 hover:bg-red-700 transition-all">
+                       <button onClick={saveFireData} disabled={isSubmitting} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-red-600/30 hover:bg-red-700 transition-all print:hidden">
                          {isSubmitting ? 'Saving...' : 'Save Checklist Data'}
                        </button>
                     )}
@@ -1071,6 +1071,17 @@ export default function App() {
                                    </tbody>
                                  </table>
                                </div>
+                               <div className="mt-4">
+                                  <label className="font-bold text-sm text-slate-800 mb-2 block print:text-black">Catatan/Komen:</label>
+                                  <textarea 
+                                    disabled={!isLevel1Admin} 
+                                    value={fireData.hydrantRemarks || ''} 
+                                    onChange={(e) => setFireData({...fireData, hydrantRemarks: e.target.value})} 
+                                    className="w-full p-3 border border-slate-300 rounded-lg text-sm disabled:bg-slate-50 disabled:text-slate-600 focus:ring-2 focus:ring-red-500 outline-none print:border-black print:bg-white print:text-black" 
+                                    rows="3" 
+                                    placeholder="Masukkan catatan jika ada..." 
+                                  />
+                               </div>
                             </div>
 
                             <div>
@@ -1126,19 +1137,34 @@ export default function App() {
                                         return (
                                            <tr key={row} className="hover:bg-slate-50/50">
                                              <td className="p-3 border border-slate-300 font-bold text-slate-800">{row}</td>
-                                             <td className={`p-2 border border-slate-300 ${isDieselBlackedOut ? 'bg-slate-800' : ''}`}>
+                                             <td className={`p-2 border border-slate-300 ${isDieselBlackedOut ? 'bg-slate-800 print:bg-slate-400' : ''}`}>
                                                 {!isDieselBlackedOut && (
-                                                   <input disabled={!isLevel1Admin} type="text" value={fireData.pumps?.[row]?.diesel || ''} onChange={(e) => handlePumpChange(row, 'diesel', e.target.value)} className="w-full p-1.5 border border-slate-200 rounded text-xs font-semibold text-center disabled:bg-transparent disabled:border-transparent" />
+                                                   <select disabled={!isLevel1Admin} value={fireData.pumps?.[row]?.diesel || ''} onChange={(e) => handlePumpChange(row, 'diesel', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-xs disabled:bg-transparent disabled:border-transparent disabled:appearance-none font-semibold">
+                                                     <option value="" disabled>Select...</option>
+                                                     <option value="Memuaskan">Memuaskan</option>
+                                                     <option value="Tidak Memuaskan">Tidak Memuaskan</option>
+                                                     <option value="N/A">N/A</option>
+                                                   </select>
                                                 )}
                                              </td>
-                                             <td className={`p-2 border border-slate-300 ${isElectricBlackedOut ? 'bg-slate-800' : ''}`}>
+                                             <td className={`p-2 border border-slate-300 ${isElectricBlackedOut ? 'bg-slate-800 print:bg-slate-400' : ''}`}>
                                                 {!isElectricBlackedOut && (
-                                                   <input disabled={!isLevel1Admin} type="text" value={fireData.pumps?.[row]?.electric || ''} onChange={(e) => handlePumpChange(row, 'electric', e.target.value)} className="w-full p-1.5 border border-slate-200 rounded text-xs font-semibold text-center disabled:bg-transparent disabled:border-transparent" />
+                                                   <select disabled={!isLevel1Admin} value={fireData.pumps?.[row]?.electric || ''} onChange={(e) => handlePumpChange(row, 'electric', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-xs disabled:bg-transparent disabled:border-transparent disabled:appearance-none font-semibold">
+                                                     <option value="" disabled>Select...</option>
+                                                     <option value="Memuaskan">Memuaskan</option>
+                                                     <option value="Tidak Memuaskan">Tidak Memuaskan</option>
+                                                     <option value="N/A">N/A</option>
+                                                   </select>
                                                 )}
                                              </td>
-                                             <td className={`p-2 border border-slate-300 ${isElectricBlackedOut ? 'bg-slate-800' : ''}`}>
+                                             <td className={`p-2 border border-slate-300 ${isElectricBlackedOut ? 'bg-slate-800 print:bg-slate-400' : ''}`}>
                                                 {!isElectricBlackedOut && (
-                                                   <input disabled={!isLevel1Admin} type="text" value={fireData.pumps?.[row]?.jockey || ''} onChange={(e) => handlePumpChange(row, 'jockey', e.target.value)} className="w-full p-1.5 border border-slate-200 rounded text-xs font-semibold text-center disabled:bg-transparent disabled:border-transparent" />
+                                                   <select disabled={!isLevel1Admin} value={fireData.pumps?.[row]?.jockey || ''} onChange={(e) => handlePumpChange(row, 'jockey', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-xs disabled:bg-transparent disabled:border-transparent disabled:appearance-none font-semibold">
+                                                     <option value="" disabled>Select...</option>
+                                                     <option value="Memuaskan">Memuaskan</option>
+                                                     <option value="Tidak Memuaskan">Tidak Memuaskan</option>
+                                                     <option value="N/A">N/A</option>
+                                                   </select>
                                                 )}
                                              </td>
                                            </tr>
@@ -1146,6 +1172,17 @@ export default function App() {
                                      })}
                                    </tbody>
                                  </table>
+                               </div>
+                               <div className="mt-4">
+                                  <label className="font-bold text-sm text-slate-800 mb-2 block print:text-black">Catatan/Komen:</label>
+                                  <textarea 
+                                    disabled={!isLevel1Admin} 
+                                    value={fireData.pumpRemarks || ''} 
+                                    onChange={(e) => setFireData({...fireData, pumpRemarks: e.target.value})} 
+                                    className="w-full p-3 border border-slate-300 rounded-lg text-sm disabled:bg-slate-50 disabled:text-slate-600 focus:ring-2 focus:ring-red-500 outline-none print:border-black print:bg-white print:text-black" 
+                                    rows="3" 
+                                    placeholder="Masukkan catatan jika ada..." 
+                                  />
                                </div>
                             </div>
                          </div>
