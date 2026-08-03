@@ -328,7 +328,8 @@ export default function App() {
   const saveFireData = async () => {
     try {
       setIsSubmitting(true);
-      await setDoc(doc(db, "settings", "fireEquipment"), fireData);
+      const updatedData = { ...fireData, lastUpdated: new Date().toISOString() };
+      await setDoc(doc(db, "settings", "fireEquipment"), updatedData);
       showToast('✅ Fire equipment checklist saved!');
       setIsSubmitting(false);
     } catch (error) {
@@ -956,7 +957,14 @@ export default function App() {
               {activeTab === 'fire-equipment' && currentUser?.role?.includes('Admin') && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
-                    <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><Flame className="text-red-600"/> Fire Fighting Equipment Checklist</h2>
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><Flame className="text-red-600"/> Fire Fighting Equipment Checklist</h2>
+                      {fireData.lastUpdated && (
+                        <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-1.5">
+                          <Clock size={16}/> Last updated: {new Date(fireData.lastUpdated).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
                     {isLevel1Admin && (
                        <button onClick={saveFireData} disabled={isSubmitting} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-red-600/30 hover:bg-red-700 transition-all">
                          {isSubmitting ? 'Saving...' : 'Save Checklist Data'}
