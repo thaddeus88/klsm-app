@@ -328,7 +328,8 @@ export default function App() {
   const saveFireData = async () => {
     try {
       setIsSubmitting(true);
-      const updatedData = { ...fireData, lastUpdated: new Date().toISOString() };
+      const timestampKey = fireTab === 'extinguisher' ? 'extinguisherLastUpdated' : 'hoseLastUpdated';
+      const updatedData = { ...fireData, [timestampKey]: new Date().toISOString() };
       await setDoc(doc(db, "settings", "fireEquipment"), updatedData);
       showToast('✅ Fire equipment checklist saved!');
       setIsSubmitting(false);
@@ -959,9 +960,9 @@ export default function App() {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
                     <div>
                       <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><Flame className="text-red-600"/> Fire Fighting Equipment Checklist</h2>
-                      {fireData.lastUpdated && (
+                      {((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated) && (
                         <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-1.5">
-                          <Clock size={16}/> Last updated: {new Date(fireData.lastUpdated).toLocaleString()}
+                          <Clock size={16}/> Last updated: {new Date((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated).toLocaleString()}
                         </p>
                       )}
                     </div>
