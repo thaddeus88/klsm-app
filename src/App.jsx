@@ -419,6 +419,37 @@ export default function App() {
     a.click();
   };
 
+  // Export Single Inspection Report
+  const downloadSingleInspection = (insp, pct, pass, total) => {
+    let resultsText = "";
+    params.forEach(p => {
+      const val = insp.results ? insp.results[p.id] : 'N/A';
+      resultsText += `- ${p.name}: ${val || 'N/A'}\n`;
+    });
+
+    let content = `KLSM HSE Hub - Inspection Report\n`;
+    content += `================================\n\n`;
+    content += `Date & Time : ${new Date(insp.date).toLocaleString()}\n`;
+    content += `Zone        : ${insp.zone}\n`;
+    content += `Inspector   : ${insp.inspector}\n`;
+    content += `Score       : ${pct}% (${pass}/${total})\n\n`;
+    content += `Detailed Results:\n`;
+    content += `-----------------\n`;
+    content += resultsText;
+    content += `\nOverall Remarks / Corrective Actions:\n`;
+    content += `-------------------------------------\n`;
+    content += `${insp.remarks || 'None'}\n`;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeZone = insp.zone.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '');
+    a.download = `Inspection_${safeZone}_${new Date(insp.date).toISOString().split('T')[0]}.txt`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   // Login Screen render
   if (activeTab === 'login') {
     return (
@@ -1028,11 +1059,11 @@ export default function App() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
-                      <tr><th className="p-4 rounded-tl-xl">Date & Time</th><th className="p-4">Zone</th><th className="p-4">Inspector</th><th className="p-4">Score</th><th className="p-4 rounded-tr-xl">Remarks</th></tr>
+                      <tr><th className="p-4 rounded-tl-xl">Date & Time</th><th className="p-4">Zone</th><th className="p-4">Inspector</th><th className="p-4">Score</th><th className="p-4">Remarks</th><th className="p-4 rounded-tr-xl text-right">Action</th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {inspections.length === 0 ? (
-                        <tr><td colSpan="5" className="p-8 text-center text-slate-400 font-medium">No inspections recorded yet.</td></tr>
+                        <tr><td colSpan="6" className="p-8 text-center text-slate-400 font-medium">No inspections recorded yet.</td></tr>
                       ) : (
                         inspections.slice().sort((a,b) => new Date(b.date) - new Date(a.date)).map(insp => {
                           let pass = 0; let total = 0;
@@ -1050,6 +1081,9 @@ export default function App() {
                               <td className="p-4 font-bold text-slate-700">{insp.inspector}</td>
                               <td className="p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${pct >= 80 ? 'bg-emerald-100 text-emerald-700' : pct >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{pct}% ({pass}/{total})</span></td>
                               <td className="p-4 text-slate-600 max-w-xs truncate" title={insp.remarks}>{insp.remarks || 'No remarks'}</td>
+                              <td className="p-4 text-right">
+                                <button onClick={() => downloadSingleInspection(insp, pct, pass, total)} className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors" title="Download Report"><Download size={16}/></button>
+                              </td>
                             </tr>
                           );
                         })
