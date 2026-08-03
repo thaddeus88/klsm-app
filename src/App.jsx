@@ -566,6 +566,43 @@ export default function App() {
   const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
   const isLevel1Admin = currentUser?.role === 'Level 1 Admin';
 
+  // Calculate target progress specifically for the Dashboard banner
+  let dashboardCompleted = 0;
+  const dashboardTarget = parseInt(currentUser?.freq) || 0;
+  const dashboardFreqType = currentUser?.freqType || 'Daily';
+  const isDashboardOffDay = (currentUser?.offDays || []).includes(new Date().toLocaleDateString('en-US', { weekday: 'long' }));
+
+  if (dashboardTarget > 0) {
+      if (dashboardFreqType === 'Monthly') {
+          const currentMonth = new Date().getMonth();
+          const currentYear = new Date().getFullYear();
+          dashboardCompleted = inspections.filter(i => i.inspectorName === currentUser?.name && new Date(i.date).getMonth() === currentMonth && new Date(i.date).getFullYear() === currentYear).length;
+      } else {
+          const today = new Date().toLocaleDateString();
+          dashboardCompleted = inspections.filter(i => i.inspectorName === currentUser?.name && new Date(i.date).toLocaleDateString() === today).length;
+      }
+  }
+
+  // Determine Dashboard Badge Color and Text
+  let dashboardTargetBadgeClass = "text-orange-700 bg-orange-100 border-orange-200";
+  let dashboardTargetText = `${currentUser?.freq || 'N/A'} ${currentUser?.freqType && currentUser?.freqType !== 'N/A' ? currentUser?.freqType : ''}`.trim();
+
+  if (dashboardTarget > 0 && !(isDashboardOffDay && dashboardFreqType === 'Daily')) {
+      if (dashboardCompleted >= dashboardTarget) {
+          dashboardTargetBadgeClass = "text-emerald-700 bg-emerald-100 border-emerald-200";
+          dashboardTargetText = `${dashboardCompleted}/${dashboardTarget} ${dashboardFreqType} (Completed)`;
+      } else {
+          dashboardTargetBadgeClass = "text-red-700 bg-red-100 border-red-200";
+          dashboardTargetText = `${dashboardCompleted}/${dashboardTarget} ${dashboardFreqType} (In Progress)`;
+      }
+  } else if (isDashboardOffDay && dashboardFreqType === 'Daily') {
+      dashboardTargetBadgeClass = "text-slate-500 bg-slate-100 border-slate-200";
+      dashboardTargetText = "Off Day";
+  } else if (!currentUser?.freq || currentUser?.freq === 'N/A') {
+      dashboardTargetBadgeClass = "text-slate-500 bg-slate-100 border-slate-200";
+      dashboardTargetText = "N/A";
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
       
@@ -655,7 +692,7 @@ export default function App() {
                       <h2 className="text-xl md:text-2xl font-black text-slate-900">Your Assigned Zones</h2>
                       <div className="text-sm font-bold text-slate-500 mt-1.5 flex items-center gap-1.5">
                         <ClipboardList size={16} className="text-orange-500"/>
-                        Target Requirement: <span className="text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200">{currentUser?.freq || 'N/A'} {currentUser?.freqType && currentUser?.freqType !== 'N/A' ? currentUser?.freqType : ''}</span>
+                        Target Requirement: <span className={`px-2 py-0.5 rounded-md border font-black ${dashboardTargetBadgeClass}`}>{dashboardTargetText}</span>
                       </div>
                     </div>
                     <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
