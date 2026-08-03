@@ -539,6 +539,7 @@ export default function App() {
         </div>
       )}
 
+      {}
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center w-full relative p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600 relative z-10">
@@ -568,6 +569,7 @@ export default function App() {
         </div>
       ) : (
         <>
+          {}
           <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
@@ -954,7 +956,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* FIRE FIGHTING EQUIPMENT TAB */}
+              {}
               {activeTab === 'fire-equipment' && currentUser?.role?.includes('Admin') && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
@@ -1131,7 +1133,7 @@ export default function App() {
                                    </thead>
                                    <tbody>
                                      {pumpRows.map(row => {
-                                        const isDieselBlackedOut = ["Panel Elektrik(Auto) *", "Injap Keluar & Masuk *", "Tolok Tekanan *", "Pam *", "Kebersihan *", "Motor Elektrik *"].includes(row);
+                                        const isDieselBlackedOut = ["Motor Elektrik *"].includes(row);
                                         const isElectricBlackedOut = ["Bateri", "Tangki Diesel (Penuh)", "Minyak Enjin", "Air Radiator"].includes(row);
                                         
                                         return (
