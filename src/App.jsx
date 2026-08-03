@@ -41,26 +41,9 @@ const initialZones = [
 const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const initialUsers = [
-  { 
-    id: 1, 
-    name: "John Doe", 
-    role: "Inspector", 
-    zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], 
-    freq: "2 times/day", 
-    password: "1234",
-    timeWindows: [{ start: "08:00", end: "10:00" }, { start: "14:00", end: "16:00" }],
-    offDays: ["Sunday"]
-  },
-  { 
-    id: 2, 
-    name: "Admin Jane", 
-    role: "Admin", 
-    zones: ["All"], 
-    freq: "N/A", 
-    password: "1234",
-    timeWindows: [{ start: "00:00", end: "23:59" }],
-    offDays: []
-  }
+  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"], timeWindows: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] },
+  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] }
 ];
 
 const initialParameters = [
@@ -74,7 +57,6 @@ const initialParameters = [
   { id: 8, name: "Environment" }
 ];
 
-// Fire Fighting Equipment Data Lists
 const hydrantLocations = ["H.1 Office", "H.2 Supervisor Room", "H.3 Oil Room", "H.4 Kernel Plant", "H.5 Boiler Station", "H.6 Biogas Scrubber", "H.7 Digester Tank", "H.8 Digester Tank", "H.9 Digester Tank", "H.10 Gas Engine"];
 const hydrantItems = ["Fire Canvas Hose", "Coupling", "Nozzle", "Fire Hydrant Box", "Valve"];
 
@@ -243,7 +225,6 @@ export default function App() {
   const handleInspectionSubmit = (e) => {
     e.preventDefault();
     
-    // Hard check on time expiration at the moment of submission
     if (!isTimeValid) {
        showToast('❌ Time window expired. Cannot submit inspection.');
        return;
@@ -251,7 +232,6 @@ export default function App() {
 
     setIsSubmitting(true);
     
-    // Robust capture of all dynamic dropdowns
     const formData = new FormData(e.target);
     let results = {};
     for (let [key, value] of formData.entries()) {
@@ -267,7 +247,7 @@ export default function App() {
       inspector: currentUser.name,
       results: results,
       remarks: formData.get('remarks'),
-      photos: attachedPhotos // Saves the attached photos to memory
+      photos: attachedPhotos 
     };
 
     setTimeout(() => {
@@ -277,7 +257,7 @@ export default function App() {
       setAttachedPhotos({});
       setActiveTab('dashboard');
       showToast('✅ Inspection Submitted Successfully!');
-    }, 1500); // Simulate processing time
+    }, 1500);
   };
 
   const handleAccidentSubmit = (e) => {
@@ -298,7 +278,6 @@ export default function App() {
     showToast('🚨 Accident Report Submitted Successfully!');
   };
 
-  // Fire Extinguisher Handlers
   const addExtinguisher = () => {
     setFireExtinguishers([...fireExtinguishers, { id: Date.now(), type: '', expiry: '', location: '', mfgDate: '' }]);
   };
@@ -315,7 +294,6 @@ export default function App() {
     ? initialZones 
     : initialZones.filter(z => currentUser?.zones.includes(z));
 
-  // Analytics Calculations
   const zonePerformanceData = initialZones.map(zone => {
     const zoneInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => i.zone === zone);
     if (zoneInspections.length === 0) return 0;
@@ -324,7 +302,6 @@ export default function App() {
       Object.values(insp.results || {}).forEach(val => {
         if (!val) return;
         const v = String(val).toLowerCase();
-        // Super robust check for all possible dropdown values to guarantee data registers
         if (v === "memuaskan" || v === "pass" || v.includes("🟢")) { memuaskan++; totalScored++; }
         if (v === "tidak memuaskan" || v === "fail" || v.includes("🔴")) { totalScored++; }
       });
@@ -336,11 +313,9 @@ export default function App() {
     return (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx).length;
   });
   
-  // Dynamically scale Monthly Inspections to hug the data tightly (Even numbers only)
   const maxMonthlyCount = Math.max(...allMonthlyCounts, 0);
   const maxMonthlyScale = Math.max(2, maxMonthlyCount % 2 === 0 ? maxMonthlyCount : maxMonthlyCount + 1);
 
-  // Dynamically scale Average Zone Compliance graph
   const allMonthlyCompliances = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIdx => {
     const monthInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx);
     let pass = 0; let total = 0;
@@ -356,13 +331,11 @@ export default function App() {
   });
   
   const maxCompValue = Math.max(...allMonthlyCompliances, 0);
-  const maxCompScale = Math.max(20, Math.ceil(maxCompValue / 20) * 20); // Scale by 20s up to 100
+  const maxCompScale = Math.max(20, Math.ceil(maxCompValue / 20) * 20);
 
-  // Login Screen render
   if (activeTab === 'login') {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col justify-between items-center w-full font-sans relative">
-        {/* Floating Toast Notification Area */}
         {toastMessage && (
           <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 z-50 animate-bounce">
             {toastMessage}
@@ -403,11 +376,9 @@ export default function App() {
     );
   }
 
-  // Main App Dashboard Render
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 relative">
       
-      {/* Floating Toast Notification Area */}
       {toastMessage && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 z-50 transition-all">
           {toastMessage}
@@ -446,7 +417,7 @@ export default function App() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           
-          {/* DASHBOARD TAB */}
+          {}
           {activeTab === 'dashboard' && (
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
@@ -484,7 +455,7 @@ export default function App() {
             </div>
           )}
 
-          {/* FIRE FIGHTING EQUIPMENT TAB */}
+          {}
           {activeTab === 'fire-fighting' && (
             <div className="max-w-7xl mx-auto space-y-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200 pb-4">
@@ -494,13 +465,11 @@ export default function App() {
                  </div>
               </div>
 
-              {/* Sub-Tab Navigation */}
               <div className="flex gap-2 overflow-x-auto pb-2">
                  <button onClick={() => setFfActiveTab('extinguisher')} className={`px-4 py-2.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${ffActiveTab === 'extinguisher' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>Portable Fire Extinguisher</button>
                  <button onClick={() => setFfActiveTab('hose-pump')} className={`px-4 py-2.5 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${ffActiveTab === 'hose-pump' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>Hose Reel, Hydrant &amp; Pump</button>
               </div>
 
-              {/* Portable Fire Extinguisher View */}
               {ffActiveTab === 'extinguisher' && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                   <div className="overflow-x-auto">
@@ -528,7 +497,17 @@ export default function App() {
                             </td>
                             <td className="p-4"><input type="date" value={ext.expiry} onChange={(e) => updateExtinguisher(ext.id, 'expiry', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" /></td>
                             <td className="p-4"><input type="text" placeholder="E.g. Office Area" value={ext.location} onChange={(e) => updateExtinguisher(ext.id, 'location', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" /></td>
-                            <td className="p-4"><input type="date" value={ext.mfgDate} onChange={(e) => updateExtinguisher(ext.id, 'mfgDate', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" /></td>
+                            <td className="p-4">
+                               <input 
+                                 type="number" 
+                                 min="1950"
+                                 max="2100"
+                                 placeholder="YYYY" 
+                                 value={ext.mfgDate} 
+                                 onChange={(e) => updateExtinguisher(ext.id, 'mfgDate', e.target.value)} 
+                                 className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white" 
+                               />
+                            </td>
                             <td className="p-4 text-center"><button onClick={() => deleteExtinguisher(ext.id)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={18}/></button></td>
                           </tr>
                         ))}
@@ -542,7 +521,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Hose Reel, Hydrant & Pump View */}
               {ffActiveTab === 'hose-pump' && (
                 <div className="space-y-8 pb-10">
                   
@@ -643,6 +621,19 @@ export default function App() {
                               <td className="p-4 font-bold text-slate-700 border-r border-slate-100">{item}</td>
                               {pumpTypes.map(type => {
                                 const key = `${item}-${type}`;
+                                
+                                // Logical blackout boundaries check
+                                const isDieselBlackout = type === "Diesel Engine Pump" && ["Panel Elektrik(Auto) *", "Injap Keluar & Masuk *", "Tolok Tekanan *", "Pam *", "Kebersihan *", "Motor Elektrik *"].includes(item);
+                                const isElectricBlackout = (type === "Electric Motor Pump" || type === "Electric Jockey Pump") && ["Bateri", "Tangki Diesel (Penuh)", "Minyak Enjin", "Air Radiator"].includes(item);
+                                
+                                if (isDieselBlackout || isElectricBlackout) {
+                                   return (
+                                     <td key={key} className="p-2 text-center bg-slate-50">
+                                        <div className="w-full h-8 bg-slate-800 rounded-md"></div>
+                                     </td>
+                                   );
+                                }
+
                                 return (
                                   <td key={key} className="p-2 text-center">
                                     <select value={pumpCheck[key] || ''} onChange={(e) => setPumpCheck({...pumpCheck, [key]: e.target.value})} className="w-full max-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white">
@@ -669,7 +660,7 @@ export default function App() {
             </div>
           )}
 
-          {/* INSPECTION FORM TAB */}
+          {}
           {activeTab === 'inspection-form' && (
             <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto relative">
               {!isTimeValid && (
@@ -711,7 +702,7 @@ export default function App() {
                                 const file = e.target.files[0];
                                 if (file) {
                                   setPhotoPreview(prev => ({...prev, [p.id]: true}));
-                                  setAttachedPhotos(prev => ({...prev, [p.id]: file.name})); // Store mock reference
+                                  setAttachedPhotos(prev => ({...prev, [p.id]: file.name})); 
                                 }
                               }}
                             />
@@ -751,7 +742,7 @@ export default function App() {
             </div>
           )}
 
-          {/* REPORT ACCIDENT TAB */}
+          {}
           {activeTab === 'report-accident' && (
             <div className="bg-white p-6 md:p-10 rounded-2xl shadow-sm border border-red-200 max-w-3xl mx-auto">
               <div className="border-b border-slate-200 pb-6 mb-6">
@@ -784,13 +775,12 @@ export default function App() {
             </div>
           )}
 
-          {/* ADMIN ANALYTICS TAB */}
+          {}
           {activeTab === 'admin-analytics' && (
             <div className="max-w-7xl mx-auto space-y-8 pb-10">
               <h2 className="text-2xl font-black text-slate-900">Analytics & Performance</h2>
               
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {/* 1. Monthly Inspections Tabulation */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                   <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
                     <BarChart3 className="text-orange-600"/> Monthly Inspections Conducted
@@ -821,7 +811,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Monthly Zone Compliance (Average %) */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                   <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
                     <BarChart3 className="text-orange-600"/> Monthly Zone Compliance (Avg %)
@@ -854,7 +843,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 3. Overall Compliance by Zone (All Time) */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
                   <BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)
@@ -880,7 +868,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Personnel Daily Progress */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="font-bold text-lg mb-4 text-slate-800 flex items-center gap-2"><Users className="text-orange-600"/> Personnel Daily Progress</h3>
                 <div className="overflow-x-auto">
@@ -920,7 +907,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Accident Records Table */}
               <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Accident / Incident Records</h3>
@@ -949,11 +935,9 @@ export default function App() {
                   </table>
                 </div>
               </div>
-
             </div>
           )}
 
-          {/* ADMIN SETTINGS TAB */}
           {activeTab === 'admin-settings' && (
             <div className="max-w-7xl mx-auto space-y-8 pb-10">
               <h2 className="text-2xl font-black text-slate-900">System Settings</h2>
@@ -961,7 +945,6 @@ export default function App() {
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-slate-800"><Users className="text-orange-600"/> Personnel Management</h3>
                 
-                {/* Add New User Form */}
                 <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8">
                   <h4 className="font-bold text-sm mb-4 text-slate-700 uppercase">Register New Personnel</h4>
                   <form onSubmit={addPersonnel} className="space-y-4">
@@ -973,7 +956,6 @@ export default function App() {
                     </div>
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Time Windows Config */}
                       <div className="bg-white p-4 rounded-lg border border-slate-200">
                         <div className="flex justify-between items-center mb-2">
                            <label className="block text-xs font-bold text-slate-500">Inspection Time Windows</label>
@@ -991,7 +973,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Off Days Config */}
                       <div className="bg-white p-4 rounded-lg border border-slate-200">
                         <label className="block text-xs font-bold text-slate-500 mb-2">Select Off Days</label>
                         <div className="flex flex-wrap gap-2">
@@ -1023,7 +1004,6 @@ export default function App() {
                   </form>
                 </div>
 
-                {/* Personnel Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
@@ -1055,7 +1035,6 @@ export default function App() {
                           </td>
                         </tr>
 
-                        {/* Inline Password Edit Row */}
                         {passwordEditId === p.id && (
                           <tr className="bg-orange-50/50 border-b border-orange-100">
                              <td colSpan="5" className="p-4">
@@ -1073,14 +1052,12 @@ export default function App() {
                           </tr>
                         )}
 
-                        {/* Inline Edit Row */}
                         {editingUserId === p.id && (
                           <tr className="bg-blue-50/50 border-b border-blue-100">
                              <td colSpan="5" className="p-4">
                                 <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
                                   <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2"><Edit2 size={16}/> Editing Schedule: {p.name}</h4>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                                     {/* Edit Windows */}
                                      <div>
                                         <div className="flex justify-between mb-2"><label className="text-xs font-bold text-slate-600">Time Windows</label><button onClick={() => setEditUserForm({...editUserForm, timeWindows: [...editUserForm.timeWindows, {start:"08:00", end:"17:00"}]})} className="text-xs text-blue-600 font-bold">+ Add</button></div>
                                         <div className="space-y-2">
@@ -1093,7 +1070,6 @@ export default function App() {
                                           ))}
                                         </div>
                                      </div>
-                                     {/* Edit Off Days */}
                                      <div>
                                         <label className="text-xs font-bold text-slate-600 mb-2 block">Off Days</label>
                                         <div className="flex flex-wrap gap-1">
@@ -1126,7 +1102,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Footer inside main layout area */}
           <div className="text-center p-4 text-xs text-slate-400 font-medium border-t border-slate-200 mt-auto">
             &copy; 2026 KLSMHSE &bull; Developed by ThadYap
           </div>
