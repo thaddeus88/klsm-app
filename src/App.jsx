@@ -39,6 +39,7 @@ const Pencil = (p) => <IconWrapper {...p}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5
 const AlertTriangle = (p) => <IconWrapper {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconWrapper>;
 const Check = (p) => <IconWrapper {...p}><polyline points="20 6 9 17 4 12"/></IconWrapper>;
 const Clock = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconWrapper>;
+const Flame = (p) => <IconWrapper {...p}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></IconWrapper>;
 
 const initialZones = [
   "Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading",
@@ -68,6 +69,27 @@ const initialParameters = [
   { id: 7, name: "Fire Fighting & Emergency", subParams: [] },
   { id: 8, name: "Environment", subParams: [] }
 ];
+
+const hydrantLocations = [
+  "H.1 Office", "H.2 Supervisor Room", "H.3 Oil Room", "H.4 Kernel Plant", "H.5 Boiler Station",
+  "H.6 Biogas Scrubber", "H.7 Digester Tank", "H.8 Digester Tank", "H.9 Digester Tank", "H.10 Gas Engine"
+];
+
+const hoseReelLocations = [
+  "HR.1 Sterilizer", "HR.2 Supervisor Room", "HR.3 EFB Press", "HR.4 PCF Station", "HR.5 PCF Station",
+  "HR.6 Kernel Plant Station", "HR.7 Kernel Plant Station", "HR.8 Boiler", "HR.9 Boiler", "HR.10 Engine Room",
+  "HR.11 Oil Room", "HR.12 Oil Room", "HR.13 Engine Gas Plant", "HR.14 Engine Gas Plant",
+  "HR.15 Kernel Silo (Top)", "HR.16 Kernel Silo (Top)"
+];
+
+const pumpRows = [
+  "Bateri", "Tangki Diesel (Penuh)", "Minyak Enjin", "Air Radiator",
+  "Panel Elektrik(Auto) *", "Injap Keluar & Masuk *", "Tolok Tekanan *",
+  "Pam *", "Kebersihan *", "Motor Elektrik *", "Cut In/Cut Out *"
+];
+
+const yearOptions = [];
+for (let i = 2000; i <= 2050; i++) yearOptions.push(i);
 
 const compressImage = (file) => {
   return new Promise((resolve) => {
@@ -108,6 +130,9 @@ export default function App() {
   const [inspections, setInspections] = useState([]);
   const [accidents, setAccidents] = useState([]);
   
+  const [fireData, setFireData] = useState({ extinguishers: [], hydrants: {}, hoseReels: {}, pumps: {} });
+  const [fireTab, setFireTab] = useState('extinguisher');
+
   const [selectedZone, setSelectedZone] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [loginError, setLoginError] = useState('');
@@ -164,7 +189,12 @@ export default function App() {
       setAccidents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => { clearInterval(timer); unsubParams(); unsubPersonnel(); unsubInspections(); unsubAccidents(); };
+    const unsubFire = onSnapshot(doc(db, "settings", "fireEquipment"), (docSnap) => {
+      if (docSnap.exists()) setFireData(docSnap.data());
+      else setDoc(doc(db, "settings", "fireEquipment"), { extinguishers: [], hydrants: {}, hoseReels: {}, pumps: {} });
+    });
+
+    return () => { clearInterval(timer); unsubParams(); unsubPersonnel(); unsubInspections(); unsubAccidents(); unsubFire(); };
   }, []);
 
   const handleLogin = (e) => {
@@ -183,197 +213,65 @@ export default function App() {
     }
   };
 
-  const addPersonnel = async (e) => {
-    e.preventDefault();
-    const checkedZones = Array.from(e.target.querySelectorAll('input[name="zone"]:checked')).map(cb => cb.value);
-    const checkedOffDays = Array.from(e.target.querySelectorAll('input[name="offDays"]:checked')).map(cb => cb.value);
-    const newPerson = {
-      id: Date.now(),
-      name: e.target.name.value,
-      role: e.target.role.value,
-      zones: e.target.role.value.includes('Admin') ? ['All'] : checkedZones,
-      freq: e.target.freq.value,
-      password: e.target.password.value,
-      offDays: checkedOffDays,
-      timeWindows: newTimeWindows
-    };
-    
-    const updatedPersonnel = [...personnel, newPerson];
-    setPersonnel(updatedPersonnel);
-    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
-    e.target.reset();
-    setNewTimeWindows([{ start: '08:00', end: '17:00' }]);
-    showToast("New personnel added to cloud.");
-  };
-
-  const editPassword = async (userId) => {
-    const newPass = prompt("Enter new password for this user:");
-    if (newPass && newPass.trim() !== "") {
-      const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, password: newPass } : p);
-      setPersonnel(updatedPersonnel);
-      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
-      showToast("Password updated successfully.");
-    }
-  };
-
-  const deleteUser = async (userId) => {
-    if(window.confirm("Are you sure you want to delete this user?")) {
-      const updatedPersonnel = personnel.filter(u => u.id !== userId);
-      setPersonnel(updatedPersonnel);
-      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
-      showToast("Personnel deleted.");
-    }
-  };
-
-  const saveOffDays = async (userId) => {
-    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, offDays: tempOffDays } : p);
-    setPersonnel(updatedPersonnel);
-    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
-    setEditingOffDaysId(null);
-    showToast("Off days updated successfully.");
-  };
-
-  const saveTimeWindow = async (userId) => {
-    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, timeWindows: tempTimeWindows } : p);
-    setPersonnel(updatedPersonnel);
-    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
-    setEditingTimeId(null);
-    showToast("Time allocation updated successfully.");
-  };
-
-  const addMainParam = async (e) => {
-    e.preventDefault();
-    const text = e.target.newMainParam.value.trim();
-    if (!text) return;
-    const newParam = { id: Date.now(), name: text, subParams: [] };
-    const updatedParams = [...params, newParam];
-    setParams(updatedParams);
-    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
-    e.target.reset();
-    showToast("New parameter category added.");
-  };
-
-  const deleteMainParam = async (paramId) => {
-    if(window.confirm("Delete this entire category and all its items?")) {
-      const updatedParams = params.filter(p => p.id !== paramId);
-      setParams(updatedParams);
-      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
-      showToast("Parameter category removed.");
-    }
-  };
-
-  const addSubParam = async (e, paramId) => {
-    e.preventDefault();
-    const text = e.target.subParamText.value.trim();
-    if (!text) return;
-    const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: [...p.subParams, { id: Date.now(), text }] } : p);
-    setParams(updatedParams);
-    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
-    e.target.reset();
-  };
-
-  const removeSubParam = async (paramId, subParamId) => {
-    if(window.confirm("Remove this checklist item?")) {
-      const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: p.subParams.filter(sp => sp.id !== subParamId) } : p);
-      setParams(updatedParams);
-      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
-    }
-  };
-
-  const saveEdit = async () => {
-    if (!editingItem.text.trim()) { setEditingItem({ id: null, subId: null, text: '' }); return; }
-    let updatedParams;
-    if (editingItem.subId === null) {
-      updatedParams = params.map(p => p.id === editingItem.id ? { ...p, name: editingItem.text } : p);
-    } else {
-      updatedParams = params.map(p => {
-        if (p.id === editingItem.id) return { ...p, subParams: p.subParams.map(sp => sp.id === editingItem.subId ? { ...sp, text: editingItem.text } : sp) };
-        return p;
-      });
-    }
-    setParams(updatedParams);
-    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
-    setEditingItem({ id: null, subId: null, text: '' });
-    showToast("Parameter updated successfully.");
-  };
-
-  const handleInspectionSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Hard check on time expiration at the moment of submission
-    const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
-    const isValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
-    if (!isValid) {
-       showToast('❌ Time window expired. Cannot submit inspection.');
-       return;
-    }
-
-    setIsSubmitting(true);
-    showToast('⏳ Processing photos and submitting...');
-    
-    const formData = new FormData(e.target);
-    const results = {};
-    const finalPhotos = {};
-    
-    for (const [itemKey, file] of Object.entries(attachedPhotos)) {
-      if (file) {
-        try {
-          const base64Data = await compressImage(file);
-          if (base64Data) finalPhotos[itemKey] = base64Data;
-        } catch (err) {
-          console.error("Photo compression error", err);
-        }
-      }
-    }
-
-    for (let [key, value] of formData.entries()) {
-      if (key.startsWith('res-')) {
-        const questionName = key.replace('res-', '');
-        results[questionName] = value;
-      }
-    }
-
-    const inspectionData = {
-      zone: selectedZone,
-      inspectorName: currentUser.name,
-      date: new Date().toISOString(),
-      remarks: formData.get('remarks') || "None",
-      results: results,
-      photos: finalPhotos
-    };
-
+  const saveFireData = async () => {
     try {
-      await addDoc(collection(db, "inspections"), inspectionData);
-      showToast('✅ Inspection Submitted Successfully!');
-      setPhotoPreview({}); 
-      setAttachedPhotos({});
+      setIsSubmitting(true);
+      await setDoc(doc(db, "settings", "fireEquipment"), fireData);
+      showToast('✅ Fire equipment checklist saved!');
       setIsSubmitting(false);
-      setActiveTab('dashboard');
     } catch (error) {
-      console.error("Error adding document: ", error);
-      showToast('❌ Error submitting inspection.');
+      console.error("Error saving fire equipment: ", error);
+      showToast('❌ Error saving checklist.');
       setIsSubmitting(false);
     }
   };
 
-  const handleAccidentSubmit = async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const accidentData = {
-      accidentDate: formData.get('accidentDate'),
-      injuredPerson: formData.get('injuredPerson') || "None",
-      damage: formData.get('damage') || "None",
-      details: formData.get('details'),
-      reportedBy: currentUser.name,
-      reportedAt: new Date().toISOString()
-    };
-    try {
-      await addDoc(collection(db, "accidents"), accidentData);
-      showToast('🚨 Accident Report Submitted Successfully!');
-      setActiveTab('dashboard');
-    } catch (error) {
-      showToast('❌ Error submitting report.');
-    }
+  const handleExtinguisherChange = (idx, field, value) => {
+    const newExt = [...fireData.extinguishers];
+    newExt[idx][field] = value;
+    setFireData({ ...fireData, extinguishers: newExt });
+  };
+
+  const addExtinguisher = () => {
+    setFireData({
+      ...fireData,
+      extinguishers: [...(fireData.extinguishers || []), { no: '', type: 'ABC', expiry: '', location: '', year: new Date().getFullYear() }]
+    });
+  };
+
+  const removeExtinguisher = (idx) => {
+    const newExt = fireData.extinguishers.filter((_, i) => i !== idx);
+    setFireData({ ...fireData, extinguishers: newExt });
+  };
+
+  const handleHydrantChange = (loc, field, value) => {
+    setFireData({
+      ...fireData,
+      hydrants: {
+        ...fireData.hydrants,
+        [loc]: { ...(fireData.hydrants[loc] || {}), [field]: value }
+      }
+    });
+  };
+
+  const handleHoseReelChange = (loc, field, value) => {
+    setFireData({
+      ...fireData,
+      hoseReels: {
+        ...fireData.hoseReels,
+        [loc]: { ...(fireData.hoseReels[loc] || {}), [field]: value }
+      }
+    });
+  };
+
+  const handlePumpChange = (row, col, value) => {
+    setFireData({
+      ...fireData,
+      pumps: {
+        ...fireData.pumps,
+        [row]: { ...(fireData.pumps[row] || {}), [col]: value }
+      }
+    });
   };
 
   const exportToExcel = () => {
@@ -444,6 +342,7 @@ export default function App() {
   // Multi-window live time validation
   const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
   const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
+  const isLevel1Admin = currentUser?.role === 'Level 1 Admin';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800">
@@ -501,6 +400,11 @@ export default function App() {
               {currentUser?.role.includes('Admin') && (
                 <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                   <BarChart3 size={20}/> <span className="text-sm md:text-base">Analytics</span>
+                </button>
+              )}
+              {currentUser?.role.includes('Admin') && (
+                <button onClick={() => setActiveTab('fire-equipment')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'fire-equipment' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                  <Flame size={20}/> <span className="text-sm md:text-base">Fire Fighting Eqp</span>
                 </button>
               )}
               {currentUser?.role === 'Level 1 Admin' && (
@@ -878,7 +782,203 @@ export default function App() {
                 </div>
               )}
 
-              {}
+              {/* FIRE FIGHTING EQUIPMENT TAB */}
+              {activeTab === 'fire-equipment' && currentUser?.role.includes('Admin') && (
+                <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
+                    <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><Flame className="text-red-600"/> Fire Fighting Equipment Checklist</h2>
+                    {isLevel1Admin && (
+                       <button onClick={saveFireData} disabled={isSubmitting} className="bg-red-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-red-600/30 hover:bg-red-700 transition-all">
+                         {isSubmitting ? 'Saving...' : 'Save Checklist Data'}
+                       </button>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
+                     <div className="flex border-b border-slate-200 bg-slate-50 print:hidden">
+                       <button onClick={() => setFireTab('extinguisher')} className={`flex-1 py-4 text-sm md:text-base font-bold transition-colors ${fireTab === 'extinguisher' ? 'bg-white text-red-600 border-b-2 border-red-600' : 'text-slate-500 hover:bg-slate-100'}`}>Portable Fire Extinguisher</button>
+                       <button onClick={() => setFireTab('hose')} className={`flex-1 py-4 text-sm md:text-base font-bold transition-colors ${fireTab === 'hose' ? 'bg-white text-red-600 border-b-2 border-red-600' : 'text-slate-500 hover:bg-slate-100'}`}>Hose Reel, Hydrant & Pump</button>
+                     </div>
+
+                     <div className="p-4 md:p-6">
+                       {fireTab === 'extinguisher' && (
+                         <div>
+                            <h3 className="font-bold text-lg mb-4 text-slate-800 border-b-2 border-slate-100 pb-2">Portable Fire Extinguisher Inventory</h3>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm text-left border-collapse border border-slate-300">
+                                <thead className="bg-slate-100 text-slate-700 font-black">
+                                  <tr>
+                                    <th className="p-3 border border-slate-300 w-16 text-center">No.</th>
+                                    <th className="p-3 border border-slate-300">Jenis Pemadam Api (ABC/CO2)</th>
+                                    <th className="p-3 border border-slate-300">Tarikh Luput</th>
+                                    <th className="p-3 border border-slate-300">Lokasi</th>
+                                    <th className="p-3 border border-slate-300">Tarikh Silinder Dibuat</th>
+                                    {isLevel1Admin && <th className="p-3 border border-slate-300 w-16 text-center print:hidden">Action</th>}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(fireData.extinguishers || []).length === 0 && (
+                                    <tr><td colSpan={isLevel1Admin ? 6 : 5} className="p-4 text-center text-slate-500 italic">No records found. Click 'Add Row' to create one.</td></tr>
+                                  )}
+                                  {(fireData.extinguishers || []).map((ext, idx) => (
+                                    <tr key={idx} className="hover:bg-slate-50/50">
+                                      <td className="p-2 border border-slate-300 text-center">
+                                        <input disabled={!isLevel1Admin} type="text" value={ext.no} onChange={e => handleExtinguisherChange(idx, 'no', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-center disabled:bg-transparent disabled:border-transparent" />
+                                      </td>
+                                      <td className="p-2 border border-slate-300">
+                                        <select disabled={!isLevel1Admin} value={ext.type} onChange={e => handleExtinguisherChange(idx, 'type', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent disabled:appearance-none">
+                                          <option value="ABC">ABC</option>
+                                          <option value="CO2">CO2</option>
+                                        </select>
+                                      </td>
+                                      <td className="p-2 border border-slate-300">
+                                        <input disabled={!isLevel1Admin} type="date" value={ext.expiry} onChange={e => handleExtinguisherChange(idx, 'expiry', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent" />
+                                      </td>
+                                      <td className="p-2 border border-slate-300">
+                                        <input disabled={!isLevel1Admin} type="text" value={ext.location} onChange={e => handleExtinguisherChange(idx, 'location', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent" />
+                                      </td>
+                                      <td className="p-2 border border-slate-300">
+                                        <select disabled={!isLevel1Admin} value={ext.year} onChange={e => handleExtinguisherChange(idx, 'year', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent disabled:appearance-none">
+                                          {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                                        </select>
+                                      </td>
+                                      {isLevel1Admin && (
+                                        <td className="p-2 border border-slate-300 text-center print:hidden">
+                                          <button onClick={() => removeExtinguisher(idx)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded"><Trash2 size={16}/></button>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {isLevel1Admin && (
+                              <button onClick={addExtinguisher} className="mt-4 flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-2 rounded-lg text-sm font-bold transition-colors print:hidden">
+                                <Plus size={16}/> Add Row
+                              </button>
+                            )}
+                         </div>
+                       )}
+
+                       {fireTab === 'hose' && (
+                         <div className="space-y-10">
+                            {/* Table 1: Fire Hydrant */}
+                            <div>
+                               <h3 className="font-bold text-lg mb-4 text-slate-800 border-b-2 border-slate-100 pb-2">Table 1: Fire Hydrant</h3>
+                               <div className="overflow-x-auto">
+                                 <table className="w-full text-sm text-left border-collapse border border-slate-300">
+                                   <thead className="bg-slate-100 text-slate-700 font-black">
+                                     <tr>
+                                       <th className="p-3 border border-slate-300 w-48">Location</th>
+                                       {["Fire Canvas Hose", "Coupling", "Nozzle", "Fire Hydrant Box", "Valve"].map(h => <th key={h} className="p-3 border border-slate-300 text-center">{h}</th>)}
+                                     </tr>
+                                   </thead>
+                                   <tbody>
+                                     {hydrantLocations.map(loc => (
+                                       <tr key={loc} className="hover:bg-slate-50/50">
+                                         <td className="p-3 border border-slate-300 font-bold text-slate-800">{loc}</td>
+                                         {["hose", "coupling", "nozzle", "box", "valve"].map(field => (
+                                            <td key={field} className="p-2 border border-slate-300">
+                                              <select disabled={!isLevel1Admin} value={fireData.hydrants?.[loc]?.[field] || ''} onChange={(e) => handleHydrantChange(loc, field, e.target.value)} className="w-full p-1 border border-slate-200 rounded text-xs disabled:bg-transparent disabled:border-transparent disabled:appearance-none font-semibold">
+                                                <option value="" disabled>Select...</option>
+                                                <option value="Memuaskan">Memuaskan</option>
+                                                <option value="Tidak Memuaskan">Tidak Memuaskan</option>
+                                                <option value="N/A">N/A</option>
+                                              </select>
+                                            </td>
+                                         ))}
+                                       </tr>
+                                     ))}
+                                   </tbody>
+                                 </table>
+                               </div>
+                            </div>
+
+                            {/* Table 2: Hose Reel */}
+                            <div>
+                               <h3 className="font-bold text-lg mb-4 text-slate-800 border-b-2 border-slate-100 pb-2">Table 2: Hose Reel</h3>
+                               <div className="overflow-x-auto">
+                                 <table className="w-full text-sm text-left border-collapse border border-slate-300">
+                                   <thead className="bg-slate-100 text-slate-700 font-black">
+                                     <tr>
+                                       <th className="p-3 border border-slate-300 w-48">Location</th>
+                                       <th className="p-3 border border-slate-300 w-48 text-center">Keadaan Hose Reel</th>
+                                       <th className="p-3 border border-slate-300">Catatan</th>
+                                     </tr>
+                                   </thead>
+                                   <tbody>
+                                     {hoseReelLocations.map(loc => (
+                                       <tr key={loc} className="hover:bg-slate-50/50">
+                                         <td className="p-3 border border-slate-300 font-bold text-slate-800">{loc}</td>
+                                         <td className="p-2 border border-slate-300">
+                                            <select disabled={!isLevel1Admin} value={fireData.hoseReels?.[loc]?.condition || ''} onChange={(e) => handleHoseReelChange(loc, 'condition', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-xs disabled:bg-transparent disabled:border-transparent disabled:appearance-none font-semibold">
+                                                <option value="" disabled>Select...</option>
+                                                <option value="Memuaskan">Memuaskan</option>
+                                                <option value="Tidak Memuaskan">Tidak Memuaskan</option>
+                                                <option value="N/A">N/A</option>
+                                            </select>
+                                         </td>
+                                         <td className="p-2 border border-slate-300">
+                                            <input disabled={!isLevel1Admin} type="text" value={fireData.hoseReels?.[loc]?.remark || ''} onChange={(e) => handleHoseReelChange(loc, 'remark', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-xs disabled:bg-transparent disabled:border-transparent" placeholder="Remarks..." />
+                                         </td>
+                                       </tr>
+                                     ))}
+                                   </tbody>
+                                 </table>
+                               </div>
+                            </div>
+
+                            {/* Table 3: Fire Fighting Pump */}
+                            <div>
+                               <h3 className="font-bold text-lg mb-4 text-slate-800 border-b-2 border-slate-100 pb-2">Table 3: Fire Fighting Pump</h3>
+                               <div className="overflow-x-auto">
+                                 <table className="w-full text-sm text-left border-collapse border border-slate-300">
+                                   <thead className="bg-slate-100 text-slate-700 font-black">
+                                     <tr>
+                                       <th className="p-3 border border-slate-300 w-48">Tempat</th>
+                                       <th className="p-3 border border-slate-300 text-center">Diesel Engine Pump</th>
+                                       <th className="p-3 border border-slate-300 text-center">Electric Motor Pump</th>
+                                       <th className="p-3 border border-slate-300 text-center">Electric Jockey Pump</th>
+                                     </tr>
+                                   </thead>
+                                   <tbody>
+                                     {pumpRows.map(row => {
+                                        // Specific blackout conditions based on prompt
+                                        const isDieselBlackedOut = ["Panel Elektrik(Auto) *", "Injap Keluar & Masuk *", "Tolok Tekanan *", "Pam *", "Kebersihan *", "Motor Elektrik *"].includes(row);
+                                        const isElectricBlackedOut = ["Bateri", "Tangki Diesel (Penuh)", "Minyak Enjin", "Air Radiator"].includes(row);
+                                        
+                                        return (
+                                           <tr key={row} className="hover:bg-slate-50/50">
+                                             <td className="p-3 border border-slate-300 font-bold text-slate-800">{row}</td>
+                                             <td className={`p-2 border border-slate-300 ${isDieselBlackedOut ? 'bg-slate-800' : ''}`}>
+                                                {!isDieselBlackedOut && (
+                                                   <input disabled={!isLevel1Admin} type="text" value={fireData.pumps?.[row]?.diesel || ''} onChange={(e) => handlePumpChange(row, 'diesel', e.target.value)} className="w-full p-1.5 border border-slate-200 rounded text-xs font-semibold text-center disabled:bg-transparent disabled:border-transparent" />
+                                                )}
+                                             </td>
+                                             <td className={`p-2 border border-slate-300 ${isElectricBlackedOut ? 'bg-slate-800' : ''}`}>
+                                                {!isElectricBlackedOut && (
+                                                   <input disabled={!isLevel1Admin} type="text" value={fireData.pumps?.[row]?.electric || ''} onChange={(e) => handlePumpChange(row, 'electric', e.target.value)} className="w-full p-1.5 border border-slate-200 rounded text-xs font-semibold text-center disabled:bg-transparent disabled:border-transparent" />
+                                                )}
+                                             </td>
+                                             <td className={`p-2 border border-slate-300 ${isElectricBlackedOut ? 'bg-slate-800' : ''}`}>
+                                                {!isElectricBlackedOut && (
+                                                   <input disabled={!isLevel1Admin} type="text" value={fireData.pumps?.[row]?.jockey || ''} onChange={(e) => handlePumpChange(row, 'jockey', e.target.value)} className="w-full p-1.5 border border-slate-200 rounded text-xs font-semibold text-center disabled:bg-transparent disabled:border-transparent" />
+                                                )}
+                                             </td>
+                                           </tr>
+                                        )
+                                     })}
+                                   </tbody>
+                                 </table>
+                               </div>
+                            </div>
+                         </div>
+                       )}
+                     </div>
+                  </div>
+                </div>
+              )}
+
               {/* INDIVIDUAL REPORT VIEW */}
               {activeTab === 'view-report' && selectedReport && (
                 <div className="max-w-4xl mx-auto bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
