@@ -860,7 +860,7 @@ export default function App() {
                           <tr><th className="p-3 md:p-4 rounded-tl-xl">Personnel</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Completed (Current Period)</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 print:divide-slate-300">
-                          {personnel.filter(p => p.role === 'Inspector').map(p => {
+                          {personnel.map(p => {
                             const target = parseInt(p.freq) || 0;
                             const freqType = p.freqType || 'Daily';
                             const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
