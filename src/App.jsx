@@ -54,9 +54,9 @@ const initialZones = [
 ];
 
 const initialUsers = [
-  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"], timeWindows: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
-  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] },
-  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] }
+  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", freqType: "Daily", password: "1234", offDays: ["Sunday"], timeWindows: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
+  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", freqType: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] },
+  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", freqType: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] }
 ];
 
 const initialParameters = [
@@ -156,6 +156,9 @@ export default function App() {
   
   const [attachedPhotos, setAttachedPhotos] = useState({});
   const [photoPreview, setPhotoPreview] = useState({});
+  
+  // New state for holding pending inspection while awaiting confirmation
+  const [pendingInspectionData, setPendingInspectionData] = useState(null);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -220,7 +223,8 @@ export default function App() {
       name: e.target.name.value,
       role: roleVal,
       zones: roleVal.includes('Admin') ? ['All'] : checkedZones,
-      freq: e.target.freq.value || 'N/A',
+      freq: roleVal.includes('Admin') ? 'N/A' : (e.target.freq.value || '0'),
+      freqType: roleVal.includes('Admin') ? 'N/A' : e.target.freqType.value,
       password: e.target.password.value,
       offDays: checkedOffDays,
       timeWindows: newTimeWindows
@@ -329,11 +333,12 @@ export default function App() {
     try {
       setIsSubmitting(true);
       const timestampKey = fireTab === 'extinguisher' ? 'extinguisherLastUpdated' : 'hoseLastUpdated';
-      const userKey = fireTab === 'extinguisher' ? 'extinguisherLastUpdatedBy' : 'hoseLastUpdatedBy';
+      const userKey = fireTab === 'extinguisher' ? 'extinguisherUpdatedBy' : 'hoseUpdatedBy';
+      
       const updatedData = { 
-        ...fireData, 
-        [timestampKey]: new Date().toISOString(),
-        [userKey]: currentUser?.name || 'Unknown'
+          ...fireData, 
+          [timestampKey]: new Date().toISOString(),
+          [userKey]: currentUser?.name || 'Unknown'
       };
       await setDoc(doc(db, "settings", "fireEquipment"), updatedData);
       showToast('✅ Fire equipment checklist saved!');
@@ -346,7 +351,7 @@ export default function App() {
   };
 
   const handleExtinguisherChange = (idx, field, value) => {
-    const newExt = [...fireData.extinguishers];
+    const newExt = [...(fireData.extinguishers || [])];
     newExt[idx][field] = value;
     setFireData({ ...fireData, extinguishers: newExt });
   };
@@ -359,7 +364,7 @@ export default function App() {
   };
 
   const removeExtinguisher = (idx) => {
-    const newExt = fireData.extinguishers.filter((_, i) => i !== idx);
+    const newExt = (fireData.extinguishers || []).filter((_, i) => i !== idx);
     setFireData({ ...fireData, extinguishers: newExt });
   };
 
@@ -368,7 +373,7 @@ export default function App() {
       ...fireData,
       hydrants: {
         ...fireData.hydrants,
-        [loc]: { ...(fireData.hydrants[loc] || {}), [field]: value }
+        [loc]: { ...(fireData.hydrants?.[loc] || {}), [field]: value }
       }
     });
   };
@@ -378,7 +383,7 @@ export default function App() {
       ...fireData,
       hoseReels: {
         ...fireData.hoseReels,
-        [loc]: { ...(fireData.hoseReels[loc] || {}), [field]: value }
+        [loc]: { ...(fireData.hoseReels?.[loc] || {}), [field]: value }
       }
     });
   };
@@ -388,7 +393,7 @@ export default function App() {
       ...fireData,
       pumps: {
         ...fireData.pumps,
-        [row]: { ...(fireData.pumps[row] || {}), [col]: value }
+        [row]: { ...(fireData.pumps?.[row] || {}), [col]: value }
       }
     });
   };
@@ -402,14 +407,47 @@ export default function App() {
        return;
     }
 
+    const target = parseInt(currentUser?.freq) || 0;
+    const freqType = currentUser?.freqType || 'Daily';
+    let completed = 0;
+    
+    // Check completion state based on freqType to prevent duplicate submissions
+    if (target > 0) {
+        if (freqType === 'Monthly') {
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            completed = inspections.filter(i => i.inspectorName === currentUser.name && new Date(i.date).getMonth() === currentMonth && new Date(i.date).getFullYear() === currentYear).length;
+        } else {
+            const today = new Date().toLocaleDateString();
+            completed = inspections.filter(i => i.inspectorName === currentUser.name && new Date(i.date).toLocaleDateString() === today).length;
+        }
+    }
+
+    const formData = new FormData(e.target);
+    const results = {};
+    for (let [key, value] of formData.entries()) {
+      if (key.startsWith('res-')) {
+        results[key.replace('res-', '')] = value;
+      }
+    }
+    const remarks = formData.get('remarks') || "None";
+    const payloadToProcess = { results, remarks, photos: attachedPhotos };
+
+    // Trigger modal if target is met instead of submitting immediately
+    if (target > 0 && completed >= target) {
+         setPendingInspectionData({ payload: payloadToProcess, period: freqType === 'Monthly' ? 'month' : 'day', target });
+         return;
+    }
+
+    finalizeInspection(payloadToProcess);
+  };
+
+  const finalizeInspection = async (payload) => {
     setIsSubmitting(true);
     showToast('⏳ Processing photos and submitting...');
     
-    const formData = new FormData(e.target);
-    const results = {};
     const finalPhotos = {};
-    
-    for (const [itemKey, file] of Object.entries(attachedPhotos)) {
+    for (const [itemKey, file] of Object.entries(payload.photos)) {
       if (file) {
         try {
           const base64Data = await compressImage(file);
@@ -418,19 +456,12 @@ export default function App() {
       }
     }
 
-    for (let [key, value] of formData.entries()) {
-      if (key.startsWith('res-')) {
-        const questionName = key.replace('res-', '');
-        results[questionName] = value;
-      }
-    }
-
     const inspectionData = {
       zone: selectedZone,
       inspectorName: currentUser.name,
       date: new Date().toISOString(),
-      remarks: formData.get('remarks') || "None",
-      results: results,
+      remarks: payload.remarks,
+      results: payload.results,
       photos: finalPhotos
     };
 
@@ -544,7 +575,6 @@ export default function App() {
         </div>
       )}
 
-      {}
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center w-full relative p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600 relative z-10">
@@ -614,10 +644,10 @@ export default function App() {
             </button>
           </aside>
 
-          <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
+          {}
+          <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white relative">
             <div className="flex-1 p-4 md:p-8 print:p-0">
               
-              {}
               {activeTab === 'dashboard' && (
                 <div className="max-w-7xl mx-auto">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
@@ -625,7 +655,7 @@ export default function App() {
                       <h2 className="text-xl md:text-2xl font-black text-slate-900">Your Assigned Zones</h2>
                       <div className="text-sm font-bold text-slate-500 mt-1.5 flex items-center gap-1.5">
                         <ClipboardList size={16} className="text-orange-500"/>
-                        Target Daily Requirement: <span className="text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200">{currentUser?.freq || 'N/A'}</span>
+                        Target Requirement: <span className="text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md border border-orange-200">{currentUser?.freq || 'N/A'} {currentUser?.freqType && currentUser?.freqType !== 'N/A' ? currentUser?.freqType : ''}</span>
                       </div>
                     </div>
                     <div className={`text-sm font-bold flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-lg border ${isTimeValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
@@ -794,6 +824,7 @@ export default function App() {
                     </div>
                   </div>
                   
+                  {}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-red-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600 print:text-black"/> Accident Records</h3>
@@ -820,23 +851,33 @@ export default function App() {
                     </div>
                   </div>
 
+                  {}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
-                    <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
+                    <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Progress Tracking</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                       <table className="w-full text-sm text-left min-w-[600px]">
                         <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black print:bg-white print:text-black">
-                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Personnel</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Completed Today</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Personnel</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Completed (Current Period)</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 print:divide-slate-300">
-                          {personnel.map(p => {
+                          {personnel.filter(p => p.role === 'Inspector').map(p => {
                             const target = parseInt(p.freq) || 0;
+                            const freqType = p.freqType || 'Daily';
                             const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
                             const isOffDay = (p.offDays || []).includes(todayName);
-                            const actualTarget = isOffDay ? 0 : target;
-                            const today = new Date().toLocaleDateString();
-                            const completedToday = inspections.filter(i => i.inspectorName === p.name && new Date(i.date).toLocaleDateString() === today).length;
+                            const actualTarget = (isOffDay && freqType === 'Daily') ? 0 : target;
                             
-                            const hasNoTarget = target === 0 && !isOffDay;
+                            let completedToday = 0;
+                            if (freqType === 'Monthly') {
+                                const currentMonth = new Date().getMonth();
+                                const currentYear = new Date().getFullYear();
+                                completedToday = inspections.filter(i => i.inspectorName === p.name && new Date(i.date).getMonth() === currentMonth && new Date(i.date).getFullYear() === currentYear).length;
+                            } else {
+                                const today = new Date().toLocaleDateString();
+                                completedToday = inspections.filter(i => i.inspectorName === p.name && new Date(i.date).toLocaleDateString() === today).length;
+                            }
+                            
+                            const hasNoTarget = actualTarget === 0 && !isOffDay;
                             const percentage = actualTarget > 0 ? Math.min((completedToday / actualTarget) * 100, 100) : (completedToday > 0 ? 100 : 0);
                             
                             return (
@@ -845,10 +886,10 @@ export default function App() {
                                   {p.name} <span className="text-xs text-slate-400 font-normal ml-1 hidden sm:inline">({p.role || 'User'})</span>
                                 </td>
                                 <td className="p-3 md:p-4 font-medium">
-                                  {isOffDay ? <span className="text-slate-400 italic">Off Day</span> : (hasNoTarget ? <span className="text-slate-400 italic">N/A</span> : `${p.freq} times`)}
+                                  {(isOffDay && freqType === 'Daily') ? <span className="text-slate-400 italic">Off Day</span> : (hasNoTarget ? <span className="text-slate-400 italic">N/A</span> : `${p.freq} (${freqType})`)}
                                 </td>
                                 <td className="p-3 md:p-4">
-                                  {isOffDay ? <span className="text-slate-400 italic text-sm font-medium">No inspection required</span> : (
+                                  {(isOffDay && freqType === 'Daily') ? <span className="text-slate-400 italic text-sm font-medium">No inspection required today</span> : (
                                     <div className="flex items-center gap-2">
                                       <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
                                         <div className="bg-orange-500 h-2.5 rounded-full" style={{width: `${percentage}%`}}></div>
@@ -860,7 +901,7 @@ export default function App() {
                                   )}
                                 </td>
                                 <td className="p-3 md:p-4">
-                                  {isOffDay ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg">Off Day</span> : 
+                                  {(isOffDay && freqType === 'Daily') ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg">Off Day</span> : 
                                      (hasNoTarget ? 
                                        (completedToday > 0 ? <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg">Active</span> : <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg">No Target</span>) : 
                                        (percentage >= 100 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">Complete</span> : <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg">In Progress</span>)
@@ -969,10 +1010,8 @@ export default function App() {
                       <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2 print:text-black"><Flame className="text-red-600 print:text-black"/> Fire Fighting Equipment Checklist</h2>
                       {((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated) && (
                         <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-1.5 print:text-black">
-                          <Clock size={16}/> Last updated: {new Date((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated).toLocaleString()}
-                          {(fireTab === 'extinguisher' ? fireData.extinguisherLastUpdatedBy : fireData.hoseLastUpdatedBy) && (
-                             <span className="text-slate-700 ml-1">by {fireTab === 'extinguisher' ? fireData.extinguisherLastUpdatedBy : fireData.hoseLastUpdatedBy}</span>
-                          )}
+                          <Clock size={16}/> Last updated: {new Date((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated).toLocaleString()} 
+                          &nbsp;by <span className="text-orange-600">{(fireTab === 'extinguisher' ? fireData.extinguisherUpdatedBy : fireData.hoseUpdatedBy) || fireData.updatedBy || 'Unknown User'}</span>
                         </p>
                       )}
                     </div>
@@ -1268,7 +1307,16 @@ export default function App() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">Full Name</label><input name="name" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm" required /></div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">Role</label><select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm"><option>Inspector</option><option>Level 1 Admin</option><option>Level 2 Admin</option></select></div>
-                          <div><label className="block text-xs font-bold text-slate-500 mb-1">Daily Frequency</label><input name="freq" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm" required /></div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">Target Frequency</label>
+                            <div className="flex gap-2">
+                               <input name="freq" type="number" min="0" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm" placeholder="Qty" required />
+                               <select name="freqType" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm">
+                                  <option value="Daily">Daily</option>
+                                  <option value="Monthly">Monthly</option>
+                               </select>
+                            </div>
+                          </div>
                           <div><label className="block text-xs font-bold text-slate-500 mb-1">Initial Password</label><input name="password" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm" required /></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1531,6 +1579,26 @@ export default function App() {
             </div>
 
             {}
+            {pendingInspectionData && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 print:hidden">
+                  <div className="bg-white p-6 md:p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 text-center animate-in fade-in zoom-in duration-200">
+                      <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <AlertTriangle size={32} />
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 mb-2">Target Already Met</h3>
+                      <p className="text-slate-600 mb-8 font-medium">You have already completed your required {pendingInspectionData.target} inspections for this {pendingInspectionData.period}. Do you still want to submit another report?</p>
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                          <button onClick={() => setPendingInspectionData(null)} className="px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors flex-1">Cancel</button>
+                          <button onClick={() => { 
+                              const payload = pendingInspectionData.payload; 
+                              setPendingInspectionData(null); 
+                              finalizeInspection(payload); 
+                          }} className="px-6 py-3 bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-colors flex-1">Yes, Submit</button>
+                      </div>
+                  </div>
+              </div>
+            )}
+
             <div className="mt-auto py-6 text-center text-xs text-slate-400 font-medium print:hidden border-t border-slate-200 bg-slate-50 w-full">
                &copy; 2026 KLSMHSE <br className="md:hidden" /><span className="hidden md:inline mx-2">•</span> Developed by ThadYap
             </div>
