@@ -404,7 +404,24 @@ export default function App() {
   });
   
   const maxCompValue = Math.max(...allMonthlyCompliances, 0);
-  const maxCompScale = Math.max(20, Math.ceil(maxCompValue / 20) * 20); 
+  const maxCompScale = Math.max(20, Math.ceil(maxCompValue / 20) * 20); // Scale by 20s up to 100
+
+  // Feature: Export Zone Compliance to CSV
+  const exportComplianceReport = () => {
+    let csv = "Zone,Total Inspections,Compliance Score (%)\n";
+    initialZones.forEach((zone, idx) => {
+      const count = (typeof inspections !== 'undefined' ? inspections : []).filter(i => i.zone === zone).length;
+      const score = zonePerformanceData[idx];
+      csv += `"${zone}",${count},${score}%\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Zone_Compliance_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
 
   // Login Screen render
   if (activeTab === 'login') {
@@ -931,16 +948,16 @@ export default function App() {
                              <span className={`text-xs font-bold ${isActiveMonth ? 'text-orange-600' : 'text-slate-500'}`}>{month}</span>
                            </div>
                          );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
+              {/* 3. Overall Compliance by Zone (All Time) */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2">
-                  <BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)
-                </h3>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                    <BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)
+                  </h3>
+                  <button onClick={exportComplianceReport} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm">
+                    <Download size={16}/> Export Report
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {initialZones.map((zone, idx) => {
                     const score = zonePerformanceData[idx];
@@ -1001,6 +1018,46 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Inspection History Log Table */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> Inspection History Log</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black">
+                      <tr><th className="p-4 rounded-tl-xl">Date & Time</th><th className="p-4">Zone</th><th className="p-4">Inspector</th><th className="p-4">Score</th><th className="p-4 rounded-tr-xl">Remarks</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {inspections.length === 0 ? (
+                        <tr><td colSpan="5" className="p-8 text-center text-slate-400 font-medium">No inspections recorded yet.</td></tr>
+                      ) : (
+                        inspections.slice().sort((a,b) => new Date(b.date) - new Date(a.date)).map(insp => {
+                          let pass = 0; let total = 0;
+                          Object.values(insp.results || {}).forEach(val => {
+                            if (!val) return;
+                            const v = String(val).toLowerCase();
+                            if (v === "memuaskan" || v === "pass" || v.includes("🟢")) { pass++; total++; }
+                            if (v === "tidak memuaskan" || v === "fail" || v.includes("🔴")) { total++; }
+                          });
+                          const pct = total > 0 ? Math.round((pass/total)*100) : 0;
+                          return (
+                            <tr key={insp.id} className="hover:bg-slate-50/50">
+                              <td className="p-4 font-bold text-slate-800">{new Date(insp.date).toLocaleString()}</td>
+                              <td className="p-4 text-slate-600 font-medium">{insp.zone}</td>
+                              <td className="p-4 font-bold text-slate-700">{insp.inspector}</td>
+                              <td className="p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${pct >= 80 ? 'bg-emerald-100 text-emerald-700' : pct >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{pct}% ({pass}/{total})</span></td>
+                              <td className="p-4 text-slate-600 max-w-xs truncate" title={insp.remarks}>{insp.remarks || 'No remarks'}</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Accident Records Table */}
               <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600"/> Accident / Incident Records</h3>
