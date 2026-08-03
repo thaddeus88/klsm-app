@@ -143,14 +143,12 @@ export default function App() {
   const [editingOffDaysId, setEditingOffDaysId] = useState(null);
   const [tempOffDays, setTempOffDays] = useState([]);
 
-  // Time allocation states for multiple windows
   const [editingTimeId, setEditingTimeId] = useState(null);
   const [tempTimeWindows, setTempTimeWindows] = useState([]);
   const [newTimeWindows, setNewTimeWindows] = useState([{ start: '08:00', end: '17:00' }]);
   
   const [historyFilter, setHistoryFilter] = useState('All');
 
-  // Real-time clock for strict locking
   const [currentTime, setCurrentTime] = useState(() => {
     const d = new Date();
     return d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0');
@@ -165,7 +163,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Real-time clock updater every 10 seconds to auto-lock forms
     const timer = setInterval(() => {
       const d = new Date();
       setCurrentTime(d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0'));
@@ -211,6 +208,121 @@ export default function App() {
     } else {
       setLoginError('Incorrect password. Please try again.');
     }
+  };
+
+  const addPersonnel = async (e) => {
+    e.preventDefault();
+    const checkedZones = Array.from(e.target.querySelectorAll('input[name="zone"]:checked')).map(cb => cb.value);
+    const checkedOffDays = Array.from(e.target.querySelectorAll('input[name="offDays"]:checked')).map(cb => cb.value);
+    const roleVal = e.target.role.value;
+    const newPerson = {
+      id: Date.now(),
+      name: e.target.name.value,
+      role: roleVal,
+      zones: roleVal.includes('Admin') ? ['All'] : checkedZones,
+      freq: e.target.freq.value || 'N/A',
+      password: e.target.password.value,
+      offDays: checkedOffDays,
+      timeWindows: newTimeWindows
+    };
+    
+    const updatedPersonnel = [...personnel, newPerson];
+    setPersonnel(updatedPersonnel);
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+    e.target.reset();
+    setNewTimeWindows([{ start: '08:00', end: '17:00' }]);
+    showToast("New personnel added to cloud.");
+  };
+
+  const editPassword = async (userId) => {
+    const newPass = prompt("Enter new password for this user:");
+    if (newPass && newPass.trim() !== "") {
+      const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, password: newPass } : p);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+      showToast("Password updated successfully.");
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    if(window.confirm("Are you sure you want to delete this user?")) {
+      const updatedPersonnel = personnel.filter(u => u.id !== userId);
+      setPersonnel(updatedPersonnel);
+      await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+      showToast("Personnel deleted.");
+    }
+  };
+
+  const saveOffDays = async (userId) => {
+    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, offDays: tempOffDays } : p);
+    setPersonnel(updatedPersonnel);
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+    setEditingOffDaysId(null);
+    showToast("Off days updated successfully.");
+  };
+
+  const saveTimeWindow = async (userId) => {
+    const updatedPersonnel = personnel.map(p => p.id === userId ? { ...p, timeWindows: tempTimeWindows } : p);
+    setPersonnel(updatedPersonnel);
+    await setDoc(doc(db, "settings", "personnel"), { personnelList: updatedPersonnel });
+    setEditingTimeId(null);
+    showToast("Time allocation updated successfully.");
+  };
+
+  const addMainParam = async (e) => {
+    e.preventDefault();
+    const text = e.target.newMainParam.value.trim();
+    if (!text) return;
+    const newParam = { id: Date.now(), name: text, subParams: [] };
+    const updatedParams = [...params, newParam];
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    e.target.reset();
+    showToast("New parameter category added.");
+  };
+
+  const deleteMainParam = async (paramId) => {
+    if(window.confirm("Delete this entire category and all its items?")) {
+      const updatedParams = params.filter(p => p.id !== paramId);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+      showToast("Parameter category removed.");
+    }
+  };
+
+  const addSubParam = async (e, paramId) => {
+    e.preventDefault();
+    const text = e.target.subParamText.value.trim();
+    if (!text) return;
+    const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: [...(p.subParams || []), { id: Date.now(), text }] } : p);
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    e.target.reset();
+  };
+
+  const removeSubParam = async (paramId, subParamId) => {
+    if(window.confirm("Remove this checklist item?")) {
+      const updatedParams = params.map(p => p.id === paramId ? { ...p, subParams: (p.subParams || []).filter(sp => sp.id !== subParamId) } : p);
+      setParams(updatedParams);
+      await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editingItem.text.trim()) { setEditingItem({ id: null, subId: null, text: '' }); return; }
+    let updatedParams;
+    if (editingItem.subId === null) {
+      updatedParams = params.map(p => p.id === editingItem.id ? { ...p, name: editingItem.text } : p);
+    } else {
+      updatedParams = params.map(p => {
+        if (p.id === editingItem.id) return { ...p, subParams: (p.subParams || []).map(sp => sp.id === editingItem.subId ? { ...sp, text: editingItem.text } : sp) };
+        return p;
+      });
+    }
+    setParams(updatedParams);
+    await setDoc(doc(db, "settings", "parameters"), { paramsList: updatedParams });
+    setEditingItem({ id: null, subId: null, text: '' });
+    showToast("Parameter updated successfully.");
   };
 
   const saveFireData = async () => {
@@ -274,6 +386,81 @@ export default function App() {
     });
   };
 
+  const handleInspectionSubmit = async (e) => {
+    e.preventDefault();
+    const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
+    const isValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
+    if (!isValid) {
+       showToast('❌ Time window expired. Cannot submit inspection.');
+       return;
+    }
+
+    setIsSubmitting(true);
+    showToast('⏳ Processing photos and submitting...');
+    
+    const formData = new FormData(e.target);
+    const results = {};
+    const finalPhotos = {};
+    
+    for (const [itemKey, file] of Object.entries(attachedPhotos)) {
+      if (file) {
+        try {
+          const base64Data = await compressImage(file);
+          if (base64Data) finalPhotos[itemKey] = base64Data;
+        } catch (err) { console.error("Photo compression error", err); }
+      }
+    }
+
+    for (let [key, value] of formData.entries()) {
+      if (key.startsWith('res-')) {
+        const questionName = key.replace('res-', '');
+        results[questionName] = value;
+      }
+    }
+
+    const inspectionData = {
+      zone: selectedZone,
+      inspectorName: currentUser.name,
+      date: new Date().toISOString(),
+      remarks: formData.get('remarks') || "None",
+      results: results,
+      photos: finalPhotos
+    };
+
+    try {
+      await addDoc(collection(db, "inspections"), inspectionData);
+      showToast('✅ Inspection Submitted Successfully!');
+      setPhotoPreview({}); 
+      setAttachedPhotos({});
+      setIsSubmitting(false);
+      setActiveTab('dashboard');
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      showToast('❌ Error submitting inspection.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAccidentSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const accidentData = {
+      accidentDate: formData.get('accidentDate'),
+      injuredPerson: formData.get('injuredPerson') || "None",
+      damage: formData.get('damage') || "None",
+      details: formData.get('details'),
+      reportedBy: currentUser?.name || "Unknown",
+      reportedAt: new Date().toISOString()
+    };
+    try {
+      await addDoc(collection(db, "accidents"), accidentData);
+      showToast('🚨 Accident Report Submitted Successfully!');
+      setActiveTab('dashboard');
+    } catch (error) {
+      showToast('❌ Error submitting report.');
+    }
+  };
+
   const exportToExcel = () => {
     if (inspections.length === 0) { showToast("No data to export."); return; }
     const headers = "Date,Zone,Inspector,Remarks\n";
@@ -294,11 +481,10 @@ export default function App() {
     showToast("Accident Excel downloaded!");
   };
 
-  const displayedZones = currentUser?.role.includes('Admin') ? initialZones : initialZones.filter(z => currentUser?.zones.includes(z));
+  const displayedZones = currentUser?.role?.includes('Admin') ? initialZones : initialZones.filter(z => (currentUser?.zones || []).includes(z));
   const currentYear = new Date().getFullYear();
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
-  // Data Logic Restructured for Graph Fixes
   const monthlyCounts = new Array(12).fill(0);
   const monthlyCompData = Array.from({length: 12}, () => ({ sum: 0, count: 0 }));
 
@@ -319,7 +505,6 @@ export default function App() {
     }
   });
 
-  // Ensure minimum scale logic to prevent single counts blowing up graph sizes
   const maxCount = Math.max(...monthlyCounts, 10); 
   const monthlyCompDataMap = monthlyCompData.map(d => ({
     avg: d.count > 0 ? Math.round(d.sum / d.count) : 0,
@@ -328,7 +513,7 @@ export default function App() {
 
   const zonePerformanceData = initialZones.map(zone => {
     const zoneInspections = inspections.filter(i => i.zone === zone);
-    if (zoneInspections.length === 0) return { avg: 0, hasData: false }; // Tracks true empties vs 0%
+    if (zoneInspections.length === 0) return { avg: 0, hasData: false }; 
     let memuaskan = 0; let totalScored = 0;
     zoneInspections.forEach(insp => {
       Object.values(insp.results || {}).forEach(val => {
@@ -339,7 +524,6 @@ export default function App() {
     return { avg: totalScored > 0 ? Math.round((memuaskan / totalScored) * 100) : 0, hasData: true };
   });
 
-  // Multi-window live time validation
   const userWindows = currentUser?.timeWindows || [{ start: currentUser?.timeStart || "00:00", end: currentUser?.timeEnd || "23:59" }];
   const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
   const isLevel1Admin = currentUser?.role === 'Level 1 Admin';
@@ -353,7 +537,6 @@ export default function App() {
         </div>
       )}
 
-      {/* LOGIN SCREEN */}
       {activeTab === 'login' ? (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center w-full relative p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border-t-4 border-orange-600 relative z-10">
@@ -367,7 +550,7 @@ export default function App() {
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select User</label>
                 <select name="userSelect" className="w-full p-3 border border-slate-200 rounded-lg bg-slate-50 focus:ring-2 focus:ring-orange-500 outline-none font-medium">
-                  {personnel.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  {personnel.map(u => <option key={u.id} value={u.id}>{u.name} ({(u.role || 'Unknown')})</option>)}
                 </select>
               </div>
               <div>
@@ -383,7 +566,6 @@ export default function App() {
         </div>
       ) : (
         <>
-          {}
           <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
@@ -397,12 +579,12 @@ export default function App() {
               <button onClick={() => setActiveTab('accident-report')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'accident-report' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                 <AlertTriangle size={20}/> <span className="text-sm md:text-base">Report Accident</span>
               </button>
-              {currentUser?.role.includes('Admin') && (
+              {currentUser?.role?.includes('Admin') && (
                 <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                   <BarChart3 size={20}/> <span className="text-sm md:text-base">Analytics</span>
                 </button>
               )}
-              {currentUser?.role.includes('Admin') && (
+              {currentUser?.role?.includes('Admin') && (
                 <button onClick={() => setActiveTab('fire-equipment')} className={`flex items-center whitespace-nowrap gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 rounded-xl font-semibold transition-colors ${activeTab === 'fire-equipment' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                   <Flame size={20}/> <span className="text-sm md:text-base">Fire Fighting Eqp</span>
                 </button>
@@ -416,18 +598,17 @@ export default function App() {
 
             <div className="hidden md:block pt-4 border-t border-slate-800 mt-auto mb-4">
                <p className="text-xs text-slate-400 font-semibold mb-1">Logged in as:</p>
-               <p className="text-sm font-bold text-white">{currentUser.name}</p>
+               <p className="text-sm font-bold text-white">{currentUser?.name}</p>
             </div>
             <button onClick={() => {setCurrentUser(null); setActiveTab('login');}} className="flex items-center justify-center md:justify-start gap-2 md:gap-3 px-4 md:px-3 py-2 md:py-3 ml-2 md:ml-0 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-xl font-bold transition-colors shrink-0">
               <LogOut size={20}/> <span className="hidden md:inline">Sign Out</span>
             </button>
           </aside>
 
-          {}
           <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
             <div className="flex-1 p-4 md:p-8 print:p-0">
               
-              {/* DASHBOARD TAB */}
+              {}
               {activeTab === 'dashboard' && (
                 <div className="max-w-7xl mx-auto">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-2">
@@ -468,7 +649,6 @@ export default function App() {
               )}
 
               {}
-              {/* ACCIDENT REPORT TAB */}
               {activeTab === 'accident-report' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto border-t-4 border-t-red-600">
                   <div className="border-b border-slate-200 pb-4 md:pb-6 mb-4 md:mb-6">
@@ -503,8 +683,7 @@ export default function App() {
               )}
 
               {}
-              {/* ANALYTICS TAB */}
-              {activeTab === 'admin-analytics' && (
+              {activeTab === 'admin-analytics' && currentUser?.role?.includes('Admin') && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
                      <h2 className="text-xl md:text-2xl font-black text-slate-900">Analytics & History</h2>
@@ -515,7 +694,6 @@ export default function App() {
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 print:hidden">
-                    
                     <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                        <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Monthly Inspections ({currentYear})</h3>
                        <div className="mt-8 ml-6 md:ml-8 relative">
@@ -573,7 +751,6 @@ export default function App() {
                        </div>
                     </div>
                     
-                    {/* ZONE PERFORMANCE GRAPH */}
                     <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-2">
                        <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600"/> Overall Compliance by Zone (All Time)</h3>
                        <div className="mt-8 ml-6 md:ml-8 relative">
@@ -608,7 +785,6 @@ export default function App() {
                     </div>
                   </div>
                   
-                  {/* ACCIDENTS TABLE */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-red-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><AlertTriangle className="text-red-600 print:text-black"/> Accident Records</h3>
@@ -635,8 +811,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {}
-                  {/* PERSONNEL DAILY PROGRESS */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -648,19 +822,18 @@ export default function App() {
                           {personnel.map(p => {
                             const target = parseInt(p.freq) || 0;
                             const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-                            const isOffDay = p.offDays && p.offDays.includes(todayName);
+                            const isOffDay = (p.offDays || []).includes(todayName);
                             const actualTarget = isOffDay ? 0 : target;
                             const today = new Date().toLocaleDateString();
                             const completedToday = inspections.filter(i => i.inspectorName === p.name && new Date(i.date).toLocaleDateString() === today).length;
                             
-                            // Handling for Admin / No target cases
                             const hasNoTarget = target === 0 && !isOffDay;
                             const percentage = actualTarget > 0 ? Math.min((completedToday / actualTarget) * 100, 100) : (completedToday > 0 ? 100 : 0);
                             
                             return (
                               <tr key={p.id} className="hover:bg-slate-50/50">
                                 <td className="p-3 md:p-4 font-bold text-slate-800">
-                                  {p.name} <span className="text-xs text-slate-400 font-normal ml-1 hidden sm:inline">({p.role})</span>
+                                  {p.name} <span className="text-xs text-slate-400 font-normal ml-1 hidden sm:inline">({p.role || 'User'})</span>
                                 </td>
                                 <td className="p-3 md:p-4 font-medium">
                                   {isOffDay ? <span className="text-slate-400 italic">Off Day</span> : (hasNoTarget ? <span className="text-slate-400 italic">N/A</span> : `${p.freq} times`)}
@@ -692,8 +865,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {}
-                  {/* ZONE COMPLIANCE PERFORMANCE */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600 print:text-black"/> Zone Compliance Performance</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
@@ -742,7 +913,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ALL HISTORICAL RECORDS */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:hidden">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                       <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2"><ClipboardList className="text-orange-600"/> All Historical Records</h3>
@@ -782,8 +952,8 @@ export default function App() {
                 </div>
               )}
 
-              {/* FIRE FIGHTING EQUIPMENT TAB */}
-              {activeTab === 'fire-equipment' && currentUser?.role.includes('Admin') && (
+              {}
+              {activeTab === 'fire-equipment' && currentUser?.role?.includes('Admin') && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
                     <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2"><Flame className="text-red-600"/> Fire Fighting Equipment Checklist</h2>
@@ -823,22 +993,23 @@ export default function App() {
                                   {(fireData.extinguishers || []).map((ext, idx) => (
                                     <tr key={idx} className="hover:bg-slate-50/50">
                                       <td className="p-2 border border-slate-300 text-center">
-                                        <input disabled={!isLevel1Admin} type="text" value={ext.no} onChange={e => handleExtinguisherChange(idx, 'no', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-center disabled:bg-transparent disabled:border-transparent" />
+                                        <input disabled={!isLevel1Admin} type="text" value={ext.no || ''} onChange={e => handleExtinguisherChange(idx, 'no', e.target.value)} className="w-full p-1 border border-slate-200 rounded text-center disabled:bg-transparent disabled:border-transparent" />
                                       </td>
                                       <td className="p-2 border border-slate-300">
-                                        <select disabled={!isLevel1Admin} value={ext.type} onChange={e => handleExtinguisherChange(idx, 'type', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent disabled:appearance-none">
+                                        <select disabled={!isLevel1Admin} value={ext.type || 'ABC'} onChange={e => handleExtinguisherChange(idx, 'type', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent disabled:appearance-none">
                                           <option value="ABC">ABC</option>
                                           <option value="CO2">CO2</option>
                                         </select>
                                       </td>
                                       <td className="p-2 border border-slate-300">
-                                        <input disabled={!isLevel1Admin} type="date" value={ext.expiry} onChange={e => handleExtinguisherChange(idx, 'expiry', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent" />
+                                        <input disabled={!isLevel1Admin} type="date" value={ext.expiry || ''} onChange={e => handleExtinguisherChange(idx, 'expiry', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent" />
                                       </td>
                                       <td className="p-2 border border-slate-300">
-                                        <input disabled={!isLevel1Admin} type="text" value={ext.location} onChange={e => handleExtinguisherChange(idx, 'location', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent" />
+                                        <input disabled={!isLevel1Admin} type="text" value={ext.location || ''} onChange={e => handleExtinguisherChange(idx, 'location', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent" />
                                       </td>
                                       <td className="p-2 border border-slate-300">
-                                        <select disabled={!isLevel1Admin} value={ext.year} onChange={e => handleExtinguisherChange(idx, 'year', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent disabled:appearance-none">
+                                        <select disabled={!isLevel1Admin} value={ext.year || ''} onChange={e => handleExtinguisherChange(idx, 'year', e.target.value)} className="w-full p-1 border border-slate-200 rounded disabled:bg-transparent disabled:border-transparent disabled:appearance-none">
+                                          <option value="" disabled>Select Year</option>
                                           {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                                         </select>
                                       </td>
@@ -862,7 +1033,6 @@ export default function App() {
 
                        {fireTab === 'hose' && (
                          <div className="space-y-10">
-                            {/* Table 1: Fire Hydrant */}
                             <div>
                                <h3 className="font-bold text-lg mb-4 text-slate-800 border-b-2 border-slate-100 pb-2">Table 1: Fire Hydrant</h3>
                                <div className="overflow-x-auto">
@@ -894,7 +1064,6 @@ export default function App() {
                                </div>
                             </div>
 
-                            {/* Table 2: Hose Reel */}
                             <div>
                                <h3 className="font-bold text-lg mb-4 text-slate-800 border-b-2 border-slate-100 pb-2">Table 2: Hose Reel</h3>
                                <div className="overflow-x-auto">
@@ -928,7 +1097,6 @@ export default function App() {
                                </div>
                             </div>
 
-                            {/* Table 3: Fire Fighting Pump */}
                             <div>
                                <h3 className="font-bold text-lg mb-4 text-slate-800 border-b-2 border-slate-100 pb-2">Table 3: Fire Fighting Pump</h3>
                                <div className="overflow-x-auto">
@@ -943,7 +1111,6 @@ export default function App() {
                                    </thead>
                                    <tbody>
                                      {pumpRows.map(row => {
-                                        // Specific blackout conditions based on prompt
                                         const isDieselBlackedOut = ["Panel Elektrik(Auto) *", "Injap Keluar & Masuk *", "Tolok Tekanan *", "Pam *", "Kebersihan *", "Motor Elektrik *"].includes(row);
                                         const isElectricBlackedOut = ["Bateri", "Tangki Diesel (Penuh)", "Minyak Enjin", "Air Radiator"].includes(row);
                                         
@@ -979,7 +1146,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* INDIVIDUAL REPORT VIEW */}
+              {}
               {activeTab === 'view-report' && selectedReport && (
                 <div className="max-w-4xl mx-auto bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
                   <div className="flex flex-col sm:flex-row justify-between items-start border-b border-slate-200 pb-6 mb-6 print:border-b-2 print:border-black">
@@ -1032,7 +1199,6 @@ export default function App() {
               )}
 
               {}
-              {/* SETTINGS TAB */}
               {activeTab === 'admin-settings' && currentUser?.role === 'Level 1 Admin' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
                   <h2 className="text-xl md:text-2xl font-black text-slate-900">System Settings</h2>
@@ -1092,8 +1258,8 @@ export default function App() {
                           {personnel.map(p => (
                           <tr key={p.id} className="hover:bg-slate-50/50">
                             <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
-                            <td className="p-3 md:p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role.includes('Admin') ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
-                            <td className="p-3 md:p-4 text-xs text-slate-600 max-w-[150px] truncate">{p.zones.join(', ')}</td>
+                            <td className="p-3 md:p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${(p.role || '').includes('Admin') ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
+                            <td className="p-3 md:p-4 text-xs text-slate-600 max-w-[150px] truncate">{(p.zones || []).join(', ')}</td>
                             
                             <td className="p-3 md:p-4 text-xs text-slate-600 font-medium">
                               {editingOffDaysId === p.id ? (
@@ -1101,7 +1267,7 @@ export default function App() {
                                    <div className="flex flex-wrap gap-2 bg-white p-2 border border-slate-200 rounded-lg shadow-inner">
                                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, idx) => (
                                        <label key={idx} className="flex items-center gap-1 cursor-pointer">
-                                         <input type="checkbox" checked={tempOffDays.includes(day)} onChange={(e) => { e.target.checked ? setTempOffDays([...tempOffDays, day]) : setTempOffDays(tempOffDays.filter(d => d !== day)); }} className="text-orange-600 rounded" />
+                                         <input type="checkbox" checked={(tempOffDays || []).includes(day)} onChange={(e) => { e.target.checked ? setTempOffDays([...tempOffDays, day]) : setTempOffDays(tempOffDays.filter(d => d !== day)); }} className="text-orange-600 rounded" />
                                          <span className="leading-tight">{day.substring(0,3)}</span>
                                        </label>
                                      ))}
@@ -1160,7 +1326,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* PARAMETERS MANAGEMENT */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <h3 className="font-bold text-base md:text-lg mb-2 flex items-center gap-2 text-slate-800"><ClipboardList className="text-orange-600"/> Parameter Management</h3>
                     <p className="text-sm text-slate-500 mb-6">These parameters build the dynamic inspection form.</p>
@@ -1176,13 +1341,13 @@ export default function App() {
                                    <button onClick={() => setEditingItem({ id: null, subId: null, text: '' })} className="bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold">Cancel</button>
                                  </div>
                               ) : (
-                                 <><span className="flex-1">{p.name}</span><div className="flex items-center gap-3"><span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{p.subParams.length} items</span><button onClick={() => setEditingItem({ id: p.id, subId: null, text: p.name })} className="text-slate-400 hover:text-orange-600"><Pencil size={16}/></button><button onClick={() => deleteMainParam(p.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16}/></button></div></>
+                                 <><span className="flex-1">{p.name}</span><div className="flex items-center gap-3"><span className="text-xs bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{(p.subParams || []).length} items</span><button onClick={() => setEditingItem({ id: p.id, subId: null, text: p.name })} className="text-slate-400 hover:text-orange-600"><Pencil size={16}/></button><button onClick={() => deleteMainParam(p.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16}/></button></div></>
                               )}
                            </div>
                            <div className="p-3 md:p-4 bg-white">
                               <ul className="space-y-2 mb-4">
-                                {p.subParams.length === 0 && <li className="text-sm text-slate-400 italic">No sub-parameters added yet.</li>}
-                                {p.subParams.map(sp => (
+                                {(p.subParams || []).length === 0 && <li className="text-sm text-slate-400 italic">No sub-parameters added yet.</li>}
+                                {(p.subParams || []).map(sp => (
                                    <li key={sp.id} className="flex justify-between items-center bg-slate-50 p-2 md:p-2.5 rounded-lg border border-slate-100 text-xs md:text-sm font-medium text-slate-700">
                                      {editingItem.id === p.id && editingItem.subId === sp.id ? (
                                         <div className="flex-1 flex items-center gap-2">
@@ -1207,11 +1372,9 @@ export default function App() {
               )}
 
               {}
-              {/* INSPECTION FORM TAB */}
               {activeTab === 'inspection-form' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto relative">
                   
-                  {/* Warning banner if time expires while form is open */}
                   {!isTimeValid && (
                      <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-bold flex items-center gap-2 print:hidden shadow-sm">
                         <Clock size={20}/> Time window has expired. This inspection is now locked and cannot be submitted.
@@ -1234,10 +1397,10 @@ export default function App() {
                         <h3 className="font-black text-slate-800 text-lg md:text-xl mb-4 pb-2 border-b-2 border-slate-100 print:text-black print:border-black">{p.name}</h3>
                         
                         <div className="space-y-3">
-                          {p.subParams.length === 0 ? (
+                          {(p.subParams || []).length === 0 ? (
                              <p className="text-sm text-slate-400 italic print:text-black">No specific checklist items defined for this category.</p>
                           ) : (
-                            p.subParams.map(sp => {
+                            (p.subParams || []).map(sp => {
                               const itemKey = `[${p.name}] ${sp.text}`;
                               return (
                                 <div key={sp.id} className="p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 md:gap-6 justify-between items-start sm:items-center print:border-black print:bg-white print:break-inside-avoid">
@@ -1311,7 +1474,7 @@ export default function App() {
               )}
             </div>
 
-            {/* FOOTER */}
+            {}
             <div className="mt-auto py-6 text-center text-xs text-slate-400 font-medium print:hidden border-t border-slate-200 bg-slate-50 w-full">
                &copy; 2026 KLSMHSE <br className="md:hidden" /><span className="hidden md:inline mx-2">•</span> Developed by ThadYap
             </div>
