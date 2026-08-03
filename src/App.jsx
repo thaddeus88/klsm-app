@@ -484,7 +484,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* SIDEBAR */}
+          {}
           <aside className="w-full md:w-64 bg-slate-900 text-white p-4 md:p-6 flex flex-row md:flex-col justify-between md:justify-start border-r border-slate-800 shadow-xl z-10 overflow-x-auto md:overflow-visible sticky top-0 md:h-screen print:hidden">
             <div className="flex items-center gap-2 mb-0 md:mb-8 mr-6 md:mr-0 shrink-0">
               <ShieldAlert size={24} className="text-orange-500"/> 
@@ -519,7 +519,7 @@ export default function App() {
             </button>
           </aside>
 
-          {/* MAIN CONTENT AREA */}
+          {}
           <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50 w-full print:p-0 print:bg-white">
             <div className="flex-1 p-4 md:p-8 print:p-0">
               
@@ -563,6 +563,7 @@ export default function App() {
                 </div>
               )}
 
+              {}
               {/* ACCIDENT REPORT TAB */}
               {activeTab === 'accident-report' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto border-t-4 border-t-red-600">
@@ -597,6 +598,7 @@ export default function App() {
                 </div>
               )}
 
+              {}
               {/* ANALYTICS TAB */}
               {activeTab === 'admin-analytics' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
@@ -729,37 +731,54 @@ export default function App() {
                     </div>
                   </div>
 
+                  {}
                   {/* PERSONNEL DAILY PROGRESS */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><BarChart3 className="text-orange-600 print:text-black"/> Personnel Daily Progress</h3>
                     <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                       <table className="w-full text-sm text-left min-w-[600px]">
                         <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-black print:bg-white print:text-black">
-                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Inspector</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Completed Today</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
+                          <tr><th className="p-3 md:p-4 rounded-tl-xl">Personnel</th><th className="p-3 md:p-4">Target Freq.</th><th className="p-3 md:p-4">Completed Today</th><th className="p-3 md:p-4 rounded-tr-xl">Status</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 print:divide-slate-300">
-                          {personnel.filter(p => p.role === 'Inspector').map(p => {
+                          {personnel.map(p => {
                             const target = parseInt(p.freq) || 0;
                             const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
                             const isOffDay = p.offDays && p.offDays.includes(todayName);
                             const actualTarget = isOffDay ? 0 : target;
                             const today = new Date().toLocaleDateString();
                             const completedToday = inspections.filter(i => i.inspectorName === p.name && new Date(i.date).toLocaleDateString() === today).length;
-                            const percentage = actualTarget > 0 ? Math.min((completedToday / actualTarget) * 100, 100) : 100;
+                            
+                            // Handling for Admin / No target cases
+                            const hasNoTarget = target === 0 && !isOffDay;
+                            const percentage = actualTarget > 0 ? Math.min((completedToday / actualTarget) * 100, 100) : (completedToday > 0 ? 100 : 0);
+                            
                             return (
                               <tr key={p.id} className="hover:bg-slate-50/50">
-                                <td className="p-3 md:p-4 font-bold text-slate-800">{p.name}</td>
-                                <td className="p-3 md:p-4 font-medium">{isOffDay ? <span className="text-slate-400 italic">Off Day</span> : `${p.freq} times`}</td>
+                                <td className="p-3 md:p-4 font-bold text-slate-800">
+                                  {p.name} <span className="text-xs text-slate-400 font-normal ml-1 hidden sm:inline">({p.role})</span>
+                                </td>
+                                <td className="p-3 md:p-4 font-medium">
+                                  {isOffDay ? <span className="text-slate-400 italic">Off Day</span> : (hasNoTarget ? <span className="text-slate-400 italic">N/A</span> : `${p.freq} times`)}
+                                </td>
                                 <td className="p-3 md:p-4">
                                   {isOffDay ? <span className="text-slate-400 italic text-sm font-medium">No inspection required</span> : (
                                     <div className="flex items-center gap-2">
-                                      <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden"><div className="bg-orange-500 h-2.5 rounded-full" style={{width: `${percentage}%`}}></div></div>
-                                      <span className="text-xs font-bold text-slate-500 print:text-black">{completedToday}/{target}</span>
+                                      <div className="w-full bg-slate-200 rounded-full h-2.5 max-w-[100px] print:hidden">
+                                        <div className="bg-orange-500 h-2.5 rounded-full" style={{width: `${percentage}%`}}></div>
+                                      </div>
+                                      <span className="text-xs font-bold text-slate-500 print:text-black">
+                                        {completedToday}{hasNoTarget ? '' : `/${target}`}
+                                      </span>
                                     </div>
                                   )}
                                 </td>
                                 <td className="p-3 md:p-4">
-                                  {isOffDay ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg">Off Day</span> : (percentage >= 100 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">Complete</span> : <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg">In Progress</span>)}
+                                  {isOffDay ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg">Off Day</span> : 
+                                     (hasNoTarget ? 
+                                       (completedToday > 0 ? <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg">Active</span> : <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs font-bold rounded-lg">No Target</span>) : 
+                                       (percentage >= 100 ? <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg">Complete</span> : <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg">In Progress</span>)
+                                     )}
                                 </td>
                               </tr>
                             );
@@ -769,6 +788,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  {}
                   {/* ZONE COMPLIANCE PERFORMANCE */}
                   <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none print:p-0">
                     <h3 className="font-bold text-base md:text-lg mb-4 text-slate-800 flex items-center gap-2"><Activity className="text-orange-600 print:text-black"/> Zone Compliance Performance</h3>
@@ -858,6 +878,7 @@ export default function App() {
                 </div>
               )}
 
+              {}
               {/* INDIVIDUAL REPORT VIEW */}
               {activeTab === 'view-report' && selectedReport && (
                 <div className="max-w-4xl mx-auto bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 print:border-none print:shadow-none print:p-0">
@@ -910,6 +931,7 @@ export default function App() {
                 </div>
               )}
 
+              {}
               {/* SETTINGS TAB */}
               {activeTab === 'admin-settings' && currentUser?.role === 'Level 1 Admin' && (
                 <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
@@ -1084,6 +1106,7 @@ export default function App() {
                 </div>
               )}
 
+              {}
               {/* INSPECTION FORM TAB */}
               {activeTab === 'inspection-form' && (
                 <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto relative">
