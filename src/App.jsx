@@ -329,7 +329,12 @@ export default function App() {
     try {
       setIsSubmitting(true);
       const timestampKey = fireTab === 'extinguisher' ? 'extinguisherLastUpdated' : 'hoseLastUpdated';
-      const updatedData = { ...fireData, [timestampKey]: new Date().toISOString() };
+      const userKey = fireTab === 'extinguisher' ? 'extinguisherLastUpdatedBy' : 'hoseLastUpdatedBy';
+      const updatedData = { 
+        ...fireData, 
+        [timestampKey]: new Date().toISOString(),
+        [userKey]: currentUser?.name || 'Unknown'
+      };
       await setDoc(doc(db, "settings", "fireEquipment"), updatedData);
       showToast('✅ Fire equipment checklist saved!');
       setIsSubmitting(false);
@@ -965,6 +970,9 @@ export default function App() {
                       {((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated) && (
                         <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-1.5 print:text-black">
                           <Clock size={16}/> Last updated: {new Date((fireTab === 'extinguisher' ? fireData.extinguisherLastUpdated : fireData.hoseLastUpdated) || fireData.lastUpdated).toLocaleString()}
+                          {(fireTab === 'extinguisher' ? fireData.extinguisherLastUpdatedBy : fireData.hoseLastUpdatedBy) && (
+                             <span className="text-slate-700 ml-1">by {fireTab === 'extinguisher' ? fireData.extinguisherLastUpdatedBy : fireData.hoseLastUpdatedBy}</span>
+                          )}
                         </p>
                       )}
                     </div>
