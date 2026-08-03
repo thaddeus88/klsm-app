@@ -98,7 +98,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // CLOUD STATE INITIALIZATION (Replaces LocalStorage)
+  // CLOUD STATE INITIALIZATION
   const [personnel, setPersonnel] = useState(initialUsers);
   const [inspections, setInspections] = useState([]);
   const [accidents, setAccidents] = useState([]);
@@ -138,7 +138,6 @@ export default function App() {
     try {
       unsubs.push(onSnapshot(collection(db, 'personnel'), (snap) => {
         if (!snap.empty) {
-          // Fallback map ensures integer IDs are retained
           setPersonnel(snap.docs.map(d => ({ ...d.data(), id: parseInt(d.id) })));
         }
       }));
@@ -187,7 +186,6 @@ export default function App() {
   const isAnyAdmin = isAdmin1 || isAdmin2;
   const isFireEqReadOnly = isAdmin2; 
 
-  // Centralized time validation for all users (No admin bypass)
   const userWindows = currentUser?.timeWindows || [{ start: "00:00", end: "23:59" }];
   const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
 
@@ -360,15 +358,13 @@ export default function App() {
     await setDoc(doc(db, 'fireEquipment', 'pumpCheck'), newData);
   };
 
-  // --- END FIREBASE WRITERS ---
-
   const displayedZones = isAnyAdmin 
     ? initialZones 
     : initialZones.filter(z => currentUser?.zones.includes(z));
 
   // Analytics Calculations
   const zonePerformanceData = initialZones.map(zone => {
-    const zoneInspections = inspections.filter(i => i.zone === zone);
+    const zoneInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => i.zone === zone);
     if (zoneInspections.length === 0) return 0;
     let memuaskan = 0; let totalScored = 0;
     zoneInspections.forEach(insp => {
@@ -383,14 +379,14 @@ export default function App() {
   });
 
   const allMonthlyCounts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIdx => {
-    return inspections.filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx).length;
+    return (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx).length;
   });
   
   const maxMonthlyCount = Math.max(...allMonthlyCounts, 0);
   const maxMonthlyScale = Math.max(2, maxMonthlyCount % 2 === 0 ? maxMonthlyCount : maxMonthlyCount + 1);
 
   const allMonthlyCompliances = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIdx => {
-    const monthInspections = inspections.filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx);
+    const monthInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => new Date(i.date || Date.now()).getMonth() === monthIdx);
     let pass = 0; let total = 0;
     monthInspections.forEach(insp => {
       Object.values(insp.results || {}).forEach(val => {
@@ -406,7 +402,7 @@ export default function App() {
   const maxCompValue = Math.max(...allMonthlyCompliances, 0);
   const maxCompScale = Math.max(20, Math.ceil(maxCompValue / 20) * 20); // Scale by 20s up to 100
 
-  // Feature: Export Zone Compliance to CSV
+  // Export Zone Compliance Data
   const exportComplianceReport = () => {
     let csv = "Zone,Total Inspections,Compliance Score (%)\n";
     initialZones.forEach((zone, idx) => {
@@ -948,6 +944,12 @@ export default function App() {
                              <span className={`text-xs font-bold ${isActiveMonth ? 'text-orange-600' : 'text-slate-500'}`}>{month}</span>
                            </div>
                          );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* 3. Overall Compliance by Zone (All Time) */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -961,7 +963,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {initialZones.map((zone, idx) => {
                     const score = zonePerformanceData[idx];
-                    const hasData = inspections.some(i => i.zone === zone);
+                    const hasData = (typeof inspections !== 'undefined' ? inspections : []).some(i => i.zone === zone);
                     const color = score >= 80 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : score >= 50 ? 'text-amber-600 bg-amber-50 border-amber-200' : hasData ? 'text-red-600 bg-red-50 border-red-200' : 'text-slate-500 bg-slate-50 border-slate-200';
                     return (
                       <div key={idx} className={`p-4 rounded-xl border flex flex-col justify-between h-full ${color}`}>
