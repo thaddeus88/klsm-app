@@ -41,9 +41,26 @@ const initialZones = [
 const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const initialUsers = [
-  { id: 1, name: "John Doe", role: "Inspector", zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], freq: "2", password: "1234", offDays: ["Sunday"], timeWindows: [{ start: "08:00", end: "12:00" }, { start: "14:00", end: "17:00" }] },
-  { id: 2, name: "Admin Jane", role: "Level 1 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] },
-  { id: 3, name: "Manager Bob", role: "Level 2 Admin", zones: ["All"], freq: "N/A", password: "1234", offDays: [], timeWindows: [{ start: "00:00", end: "23:59" }] }
+  { 
+    id: 1, 
+    name: "John Doe", 
+    role: "Inspector", 
+    zones: ["Zone 1 – Laboratory, CPO Despatch, Oil Storage Tank & FFB Grading", "Zone 2 – Workshop"], 
+    freq: "2 times/day", 
+    password: "1234",
+    timeWindows: [{ start: "08:00", end: "10:00" }, { start: "14:00", end: "16:00" }],
+    offDays: ["Sunday"]
+  },
+  { 
+    id: 2, 
+    name: "Admin Jane", 
+    role: "Admin Level 1", 
+    zones: ["All"], 
+    freq: "N/A", 
+    password: "1234",
+    timeWindows: [{ start: "00:00", end: "23:59" }],
+    offDays: []
+  }
 ];
 
 const initialParameters = [
@@ -156,6 +173,13 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // ROLE & ACCESS LOGIC
+  // "Admin" is kept for legacy compatibility for any existing saved users
+  const isAdmin1 = currentUser?.role === 'Admin Level 1' || currentUser?.role === 'Admin';
+  const isAdmin2 = currentUser?.role === 'Admin Level 2';
+  const isAnyAdmin = isAdmin1 || isAdmin2;
+  const isFireEqReadOnly = isAdmin2; // Admin Level 2 can view, but cannot edit fire equipment
+
   // Centralized time validation for all users (No admin bypass)
   const userWindows = currentUser?.timeWindows || [{ start: "00:00", end: "23:59" }];
   const isTimeValid = userWindows.some(w => (!w.start || !w.end) || (currentTime >= w.start && currentTime <= w.end));
@@ -197,12 +221,15 @@ export default function App() {
     const checkedZones = Array.from(e.target.zone || [])
       .filter(checkbox => checkbox.checked)
       .map(checkbox => checkbox.value);
+      
+    const selectedRole = e.target.role.value;
+    const isNewUserAdmin = selectedRole.includes('Admin');
 
     const newPerson = {
       id: Date.now(),
       name: e.target.name.value,
-      role: e.target.role.value,
-      zones: e.target.role.value === 'Admin' ? ['All'] : checkedZones,
+      role: selectedRole,
+      zones: isNewUserAdmin ? ['All'] : checkedZones,
       freq: e.target.freq.value,
       password: e.target.password.value,
       timeWindows: [...newUserWindows],
@@ -225,6 +252,7 @@ export default function App() {
   const handleInspectionSubmit = (e) => {
     e.preventDefault();
     
+    // Hard check on time expiration at the moment of submission
     if (!isTimeValid) {
        showToast('❌ Time window expired. Cannot submit inspection.');
        return;
@@ -232,6 +260,7 @@ export default function App() {
 
     setIsSubmitting(true);
     
+    // Robust capture of all dynamic dropdowns
     const formData = new FormData(e.target);
     let results = {};
     for (let [key, value] of formData.entries()) {
@@ -257,7 +286,7 @@ export default function App() {
       setAttachedPhotos({});
       setActiveTab('dashboard');
       showToast('✅ Inspection Submitted Successfully!');
-    }, 1500);
+    }, 1500); 
   };
 
   const handleAccidentSubmit = (e) => {
@@ -290,10 +319,11 @@ export default function App() {
     setFireExtinguishers(fireExtinguishers.filter(ext => ext.id !== id));
   };
 
-  const displayedZones = currentUser?.role === 'Admin' 
+  const displayedZones = isAnyAdmin 
     ? initialZones 
     : initialZones.filter(z => currentUser?.zones.includes(z));
 
+  // Analytics Calculations
   const zonePerformanceData = initialZones.map(zone => {
     const zoneInspections = (typeof inspections !== 'undefined' ? inspections : []).filter(i => i.zone === zone);
     if (zoneInspections.length === 0) return 0;
@@ -331,8 +361,9 @@ export default function App() {
   });
   
   const maxCompValue = Math.max(...allMonthlyCompliances, 0);
-  const maxCompScale = Math.max(20, Math.ceil(maxCompValue / 20) * 20);
+  const maxCompScale = Math.max(20, Math.ceil(maxCompValue / 20) * 20); 
 
+  // Login Screen render
   if (activeTab === 'login') {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col justify-between items-center w-full font-sans relative">
@@ -376,6 +407,7 @@ export default function App() {
     );
   }
 
+  // Main App Dashboard Render
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 relative">
       
@@ -394,15 +426,19 @@ export default function App() {
           <nav className="space-y-2">
             <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'dashboard' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard size={20}/> Dashboard</button>
             
-            <button onClick={() => setActiveTab('fire-fighting')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'fire-fighting' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Flame size={20}/> Fire Equipment</button>
-            
             <button onClick={() => setActiveTab('report-accident')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'report-accident' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><AlertTriangle size={20}/> Report Accident</button>
             
-            {currentUser?.role === 'Admin' && (
-              <>
-                <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> Analytics</button>
-                <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20}/> Settings</button>
-              </>
+            {/* Admin Only Tabs */}
+            {isAnyAdmin && (
+               <button onClick={() => setActiveTab('fire-fighting')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'fire-fighting' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Flame size={20}/> Fire Equipment</button>
+            )}
+            
+            {isAnyAdmin && (
+               <button onClick={() => setActiveTab('admin-analytics')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-analytics' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20}/> Analytics</button>
+            )}
+
+            {isAdmin1 && (
+               <button onClick={() => setActiveTab('admin-settings')} className={`flex items-center gap-3 w-full p-3 rounded-xl font-semibold transition-colors ${activeTab === 'admin-settings' ? 'bg-orange-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20}/> Settings</button>
             )}
           </nav>
         </div>
@@ -417,7 +453,7 @@ export default function App() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           
-          {}
+          {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
@@ -455,13 +491,13 @@ export default function App() {
             </div>
           )}
 
-          {}
+          {/* FIRE FIGHTING EQUIPMENT TAB */}
           {activeTab === 'fire-fighting' && (
             <div className="max-w-7xl mx-auto space-y-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200 pb-4">
                  <div>
                    <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2"><Flame className="text-orange-600"/> Fire Fighting Equipment Checklist</h2>
-                   <p className="text-sm font-medium text-slate-500 mt-1">Monthly inspection tracking for all fire safety equipment (Auto-saves as you edit).</p>
+                   <p className="text-sm font-medium text-slate-500 mt-1">Monthly inspection tracking for all fire safety equipment.</p>
                  </div>
               </div>
 
@@ -481,7 +517,7 @@ export default function App() {
                           <th className="p-4">Tarikh Luput</th>
                           <th className="p-4">Lokasi</th>
                           <th className="p-4">Tarikh Silinder Dibuat</th>
-                          <th className="p-4 w-16 text-center">Action</th>
+                          {!isFireEqReadOnly && <th className="p-4 w-16 text-center">Action</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -489,34 +525,44 @@ export default function App() {
                           <tr key={ext.id} className="hover:bg-slate-50/50">
                             <td className="p-4 font-bold text-slate-400 text-center">{idx + 1}</td>
                             <td className="p-4">
-                              <select value={ext.type} onChange={(e) => updateExtinguisher(ext.id, 'type', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white">
+                              <select disabled={isFireEqReadOnly} value={ext.type} onChange={(e) => updateExtinguisher(ext.id, 'type', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
                                 <option value="" disabled>Pilih Jenis...</option>
                                 <option value="ABC">ABC</option>
                                 <option value="CO2">CO2</option>
                               </select>
                             </td>
-                            <td className="p-4"><input type="date" value={ext.expiry} onChange={(e) => updateExtinguisher(ext.id, 'expiry', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" /></td>
-                            <td className="p-4"><input type="text" placeholder="E.g. Office Area" value={ext.location} onChange={(e) => updateExtinguisher(ext.id, 'location', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500" /></td>
+                            <td className="p-4"><input disabled={isFireEqReadOnly} type="date" value={ext.expiry} onChange={(e) => updateExtinguisher(ext.id, 'expiry', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100 disabled:text-slate-500" /></td>
+                            <td className="p-4"><input disabled={isFireEqReadOnly} type="text" placeholder="E.g. Office Area" value={ext.location} onChange={(e) => updateExtinguisher(ext.id, 'location', e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-100 disabled:text-slate-500" /></td>
                             <td className="p-4">
                                <input 
+                                 disabled={isFireEqReadOnly}
                                  type="number" 
                                  min="1950"
                                  max="2100"
                                  placeholder="YYYY" 
                                  value={ext.mfgDate} 
                                  onChange={(e) => updateExtinguisher(ext.id, 'mfgDate', e.target.value)} 
-                                 className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white" 
+                                 className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500" 
                                />
                             </td>
-                            <td className="p-4 text-center"><button onClick={() => deleteExtinguisher(ext.id)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={18}/></button></td>
+                            {!isFireEqReadOnly && (
+                               <td className="p-4 text-center">
+                                 <button onClick={() => deleteExtinguisher(ext.id)} className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"><Trash2 size={18}/></button>
+                               </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                   <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50">
-                     <button onClick={addExtinguisher} className="text-sm font-bold text-orange-600 flex items-center gap-2 hover:text-orange-700 bg-orange-100/50 px-4 py-2 rounded-lg"><Plus size={16}/> Add Row</button>
-                     <button onClick={() => showToast("✅ All data is saved automatically!")} className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex items-center gap-2"><Save size={16}/> Saved Automatically</button>
+                     {!isFireEqReadOnly && <button onClick={addExtinguisher} className="text-sm font-bold text-orange-600 flex items-center gap-2 hover:text-orange-700 bg-orange-100/50 px-4 py-2 rounded-lg"><Plus size={16}/> Add Row</button>}
+                     
+                     {isFireEqReadOnly ? (
+                        <div className="ml-auto bg-slate-200 text-slate-500 px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2"><ShieldAlert size={16}/> Read Only Mode</div>
+                     ) : (
+                        <button onClick={() => showToast("✅ All data is saved automatically!")} className="ml-auto bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors flex items-center gap-2"><Save size={16}/> Saved Automatically</button>
+                     )}
                   </div>
                 </div>
               )}
@@ -543,7 +589,7 @@ export default function App() {
                                 const key = `${loc}-${item}`;
                                 return (
                                   <td key={key} className="p-2 text-center">
-                                    <select value={hydrantCheck[key] || ''} onChange={(e) => setHydrantCheck({...hydrantCheck, [key]: e.target.value})} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white">
+                                    <select disabled={isFireEqReadOnly} value={hydrantCheck[key] || ''} onChange={(e) => setHydrantCheck({...hydrantCheck, [key]: e.target.value})} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
                                       <option value="" disabled>Status...</option>
                                       <option value="Memuaskan">Memuaskan</option>
                                       <option value="Tidak Memuaskan">Tidak Memuaskan</option>
@@ -580,14 +626,15 @@ export default function App() {
                                   <td key={key} className="p-2 text-center">
                                     {item === 'Catatan' ? (
                                       <input 
+                                        disabled={isFireEqReadOnly}
                                         type="text" 
                                         placeholder="Add remarks..." 
                                         value={hoseReelCheck[key] || ''} 
                                         onChange={(e) => setHoseReelCheck({...hoseReelCheck, [key]: e.target.value})} 
-                                        className="w-full min-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white"
+                                        className="w-full min-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500"
                                       />
                                     ) : (
-                                      <select value={hoseReelCheck[key] || ''} onChange={(e) => setHoseReelCheck({...hoseReelCheck, [key]: e.target.value})} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white">
+                                      <select disabled={isFireEqReadOnly} value={hoseReelCheck[key] || ''} onChange={(e) => setHoseReelCheck({...hoseReelCheck, [key]: e.target.value})} className="w-full max-w-[140px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
                                         <option value="" disabled>Status...</option>
                                         <option value="Memuaskan">Memuaskan</option>
                                         <option value="Tidak Memuaskan">Tidak Memuaskan</option>
@@ -636,7 +683,7 @@ export default function App() {
 
                                 return (
                                   <td key={key} className="p-2 text-center">
-                                    <select value={pumpCheck[key] || ''} onChange={(e) => setPumpCheck({...pumpCheck, [key]: e.target.value})} className="w-full max-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white">
+                                    <select disabled={isFireEqReadOnly} value={pumpCheck[key] || ''} onChange={(e) => setPumpCheck({...pumpCheck, [key]: e.target.value})} className="w-full max-w-[200px] p-2 text-xs border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500 bg-white disabled:bg-slate-100 disabled:text-slate-500">
                                       <option value="" disabled>Status...</option>
                                       <option value="Memuaskan">Memuaskan</option>
                                       <option value="Tidak Memuaskan">Tidak Memuaskan</option>
@@ -653,14 +700,18 @@ export default function App() {
                   </div>
 
                   <div className="flex justify-end pt-2">
-                     <button onClick={() => showToast("✅ All checklists are saved automatically!")} className="bg-orange-600 text-white px-8 py-3 rounded-xl font-black shadow-lg hover:bg-orange-700 transition-colors flex items-center gap-2"><Save size={20}/> Saved Automatically</button>
+                     {isFireEqReadOnly ? (
+                        <div className="bg-slate-200 text-slate-500 px-8 py-3 rounded-xl font-black shadow-none flex items-center gap-2"><ShieldAlert size={20}/> Read Only Mode</div>
+                     ) : (
+                        <button onClick={() => showToast("✅ All checklists are saved automatically!")} className="bg-orange-600 text-white px-8 py-3 rounded-xl font-black shadow-lg hover:bg-orange-700 transition-colors flex items-center gap-2"><Save size={20}/> Saved Automatically</button>
+                     )}
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {}
+          {/* INSPECTION FORM TAB */}
           {activeTab === 'inspection-form' && (
             <div className="bg-white p-4 md:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-4xl mx-auto relative">
               {!isTimeValid && (
@@ -702,7 +753,7 @@ export default function App() {
                                 const file = e.target.files[0];
                                 if (file) {
                                   setPhotoPreview(prev => ({...prev, [p.id]: true}));
-                                  setAttachedPhotos(prev => ({...prev, [p.id]: file.name})); 
+                                  setAttachedPhotos(prev => ({...prev, [p.id]: file.name}));
                                 }
                               }}
                             />
@@ -742,7 +793,7 @@ export default function App() {
             </div>
           )}
 
-          {}
+          {/* REPORT ACCIDENT TAB */}
           {activeTab === 'report-accident' && (
             <div className="bg-white p-6 md:p-10 rounded-2xl shadow-sm border border-red-200 max-w-3xl mx-auto">
               <div className="border-b border-slate-200 pb-6 mb-6">
@@ -775,7 +826,7 @@ export default function App() {
             </div>
           )}
 
-          {}
+          {/* ADMIN ANALYTICS TAB */}
           {activeTab === 'admin-analytics' && (
             <div className="max-w-7xl mx-auto space-y-8 pb-10">
               <h2 className="text-2xl font-black text-slate-900">Analytics & Performance</h2>
@@ -938,6 +989,7 @@ export default function App() {
             </div>
           )}
 
+          {/* ADMIN SETTINGS TAB */}
           {activeTab === 'admin-settings' && (
             <div className="max-w-7xl mx-auto space-y-8 pb-10">
               <h2 className="text-2xl font-black text-slate-900">System Settings</h2>
@@ -950,7 +1002,14 @@ export default function App() {
                   <form onSubmit={addPersonnel} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">Full Name</label><input name="name" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required /></div>
-                      <div><label className="block text-xs font-bold text-slate-500 mb-1">Role</label><select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none"><option>Inspector</option><option>Admin</option></select></div>
+                      <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1">Role</label>
+                         <select name="role" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                            <option value="Inspector">Inspector</option>
+                            <option value="Admin Level 2">Admin Level 2</option>
+                            <option value="Admin Level 1">Admin Level 1</option>
+                         </select>
+                      </div>
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">Daily Frequency</label><input name="freq" placeholder="E.g. 2 times/day" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required /></div>
                       <div><label className="block text-xs font-bold text-slate-500 mb-1">Initial Password</label><input name="password" type="text" className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required /></div>
                     </div>
@@ -990,7 +1049,7 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-2">Assign Zones</label>
+                      <label className="block text-xs font-bold text-slate-500 mb-2">Assign Zones (Only required for Inspectors)</label>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 bg-white p-4 rounded-lg border border-slate-200">
                          {initialZones.map((z, idx) => (
                            <label key={idx} className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
@@ -1014,7 +1073,7 @@ export default function App() {
                       <React.Fragment key={p.id}>
                         <tr className="hover:bg-slate-50/50">
                           <td className="p-4 font-bold text-slate-800">{p.name}</td>
-                          <td className="p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role === 'Admin' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
+                          <td className="p-4"><span className={`px-2 py-1 rounded-lg text-xs font-bold ${p.role.includes('Admin') ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{p.role}</span></td>
                           <td className="p-4">
                              <div className="flex flex-col gap-1 text-xs">
                                <div className="text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded inline-block w-max">
